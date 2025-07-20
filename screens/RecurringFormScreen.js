@@ -25,6 +25,11 @@ export default function RecurringFormScreen({ navigation, route }) {
   const [weekendPolicy, setWeekendPolicy] = useState(existing?.weekendPolicy || 'post_on_date');
 
   const onSave = () => {
+    if (type === 'transfer' && !transferToAccountId) {
+      alert('Please select a destination account for the transfer.');
+      return;
+    }
+
     const recurringItem = {
       id: recurringId || Date.now().toString(),
       name,
@@ -96,6 +101,7 @@ export default function RecurringFormScreen({ navigation, route }) {
         <>
           <Text style={styles.label}>To Account</Text>
           <Picker selectedValue={transferToAccountId} onValueChange={setTransferToAccountId}>
+            <Picker.Item label="Select an account" value="" />
             {accounts.filter(acc => acc.id !== accountId).map(acc => (
               <Picker.Item key={acc.id} label={acc.name} value={acc.id} />
             ))}

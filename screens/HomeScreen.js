@@ -27,7 +27,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Accounts Forecast</Text>
       <ScrollView>
-        {[0, 1, 2].map((monthOffset) => {
+        {Array.from({ length: 12 }, (_, monthOffset) => {
           const monthDate = addMonths(new Date(), monthOffset);
           const monthLabel = format(monthDate, 'MMMM yyyy');
           const expanded = expandedMonths[monthLabel] || false;
@@ -49,7 +49,7 @@ export default function HomeScreen() {
                   const allTx = [...(state.transactions || []), ...(state.forecasted || [])];
                   const filtered = allTx.filter(
                     tx =>
-                      tx.accountId === account.id &&
+                      (tx.accountId === account.id || tx.transferToAccountId === account.id) &&
                       new Date(tx.date) >= monthStart &&
                       new Date(tx.date) <= monthEnd
                   );
@@ -75,16 +75,21 @@ export default function HomeScreen() {
                     const dailyTxs = filtered.filter(tx => format(new Date(tx.date), 'yyyy-MM-dd') === day);
                     dailyTxs.forEach(tx => {
                       const amount = parseFloat(tx.amount || tx.forecastedAmount || 0);
-                      const delta = tx.type === 'income' ? amount : -amount;
-                      balance += delta;
+                      let delta = 0;
 
-                      // Apply transfer destination side
-                      if (tx.type === 'transfer' && tx.transferToAccountId) {
-                        const transferToId = tx.transferToAccountId;
-                        const prevBal = previousEndingBalances.get(transferToId) ?? 2000;
-                        const updatedBal = prevBal + amount;
-                        previousEndingBalances.set(transferToId, updatedBal);
+                      if (tx.type === 'income') {
+                        delta = amount;
+                      } else if (tx.type === 'expense') {
+                        delta = -amount;
+                      } else if (tx.type === 'transfer') {
+                        if (tx.accountId === account.id) {
+                          delta = -amount; // transfer out
+                        } else if (tx.transferToAccountId === account.id) {
+                          delta = amount; // transfer in
+                        }
                       }
+                      
+                      balance += delta;
                     });
 
                     const override = (state.balanceOverrides || []).find(
