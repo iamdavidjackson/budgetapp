@@ -1,11 +1,12 @@
-import React, { useContext, useMemo } from 'react';
-import { ScrollView, View, Text, StyleSheet, FlatList } from 'react-native';
+import React, { useContext, useMemo, useState } from 'react';
+import { ScrollView, View, Text, StyleSheet, Dimensions } from 'react-native';
 import { BudgetContext } from '../context/BudgetContext';
 import { generateForecast } from '../utils/forecastUtils';
 import { addMonths, format, parseISO } from 'date-fns';
-import { Swipeable, RectButton } from 'react-native-gesture-handler';
+import { RectButton } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LineChart } from 'react-native-chart-kit';
 
 export default function HomeScreen() {
   const { state } = useContext(BudgetContext);
@@ -53,62 +54,144 @@ export default function HomeScreen() {
     </RectButton>
   );
 
+  // State for expanded months (first month expanded by default)
+  const firstMonth = format(addMonths(new Date(), 0), 'MMMM yyyy');
+  const [expandedMonths, setExpandedMonths] = useState({ [firstMonth]: true });
+
+  const toggleExpanded = (monthLabel) => {
+    setExpandedMonths(prev => ({
+      ...prev,
+      [monthLabel]: !prev[monthLabel]
+    }));
+  };
+
+  // Track previous ending balances for each account across months
+  const previousEndingBalances = new Map();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Accounts Forecast</Text>
-      <FlatList
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        data={[0, 1, 2]}
-        keyExtractor={(item) => item.toString()}
-        renderItem={({ item: monthOffset }) => {
+      <ScrollView>
+        {[0, 1, 2].map((monthOffset) => {
           const monthDate = addMonths(new Date(), monthOffset);
           const monthLabel = format(monthDate, 'MMMM yyyy');
+          const expanded = expandedMonths[monthLabel] || false;
 
           return (
-            <View style={styles.carouselPage}>
-              <Text style={styles.monthLabel}>{monthLabel}</Text>
-              {(state.accounts || []).map(account => {
-                const starting = Math.floor(Math.random() * 1000) + 100;
-                const ending = starting + Math.floor(Math.random() * 1000) - 500;
-                const min = Math.min(starting, ending) - Math.floor(Math.random() * 200);
-                const max = Math.max(starting, ending) + Math.floor(Math.random() * 200);
+            <View key={monthLabel} style={{ marginBottom: 12 }}>
+              <RectButton onPress={() => toggleExpanded(monthLabel)} style={styles.accordionHeader}>
+                <Text style={styles.monthLabel}>{monthLabel}</Text>
+                <MaterialIcons
+                  name={expanded ? 'expand-less' : 'expand-more'}
+                  size={24}
+                  color="#333"
+                />
+              </RectButton>
+              {expanded &&
+                (state.accounts || []).map((account) => {
+                  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+                  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+                  const allTx = [...(state.transactions || []), ...(state.forecasted || [])];
+                  const filtered = allTx.filter(
+                    tx =>
+                      tx.accountId === account.id &&
+                      new Date(tx.date) >= monthStart &&
+                      new Date(tx.date) <= monthEnd
+                  );
+                  let starting = previousEndingBalances.get(account.id) ?? 2000;
+                  let current = starting;
+                  let min = current;
+                  let max = current;
 
-                return (
-                  <View key={account.id} style={styles.accountCard}>
-                    <Text style={styles.accountName}>{account.name}</Text>
-                    <View style={styles.balanceRow}>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>Start</Text>
-                        <Text style={styles.balanceValue}>${starting}</Text>
+                  filtered
+                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+                    .forEach(tx => {
+                      const amount = parseFloat(tx.amount || tx.forecastedAmount || 0);
+                      const isIncome = tx.type === 'income';
+                      const delta = isIncome ? amount : -amount;
+                      current += delta;
+                      min = Math.min(min, current);
+                      max = Math.max(max, current);
+                    });
+
+                  const ending = current;
+                  previousEndingBalances.set(account.id, ending);
+
+                  const monthDays = [];
+                  const monthStartDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+                  const numDays = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+                  for (let i = 0; i < numDays; i++) {
+                    const date = new Date(monthStartDate);
+                    date.setDate(date.getDate() + i);
+                    monthDays.push(format(date, 'yyyy-MM-dd'));
+                  }
+
+                  let balance = starting;
+                  const dailyBalances = [];
+
+                  monthDays.forEach(day => {
+                    const dailyTxs = filtered.filter(tx => format(new Date(tx.date), 'yyyy-MM-dd') === day);
+                    dailyTxs.forEach(tx => {
+                      const amount = parseFloat(tx.amount || tx.forecastedAmount || 0);
+                      const delta = tx.type === 'income' ? amount : -amount;
+                      balance += delta;
+                    });
+                    dailyBalances.push(balance);
+                  });
+
+                  return (
+                    <View key={account.id} style={styles.accountCard}>
+                      <Text style={styles.accountName}>{account.name}</Text>
+                      <View style={styles.balanceRow}>
+                        <View style={styles.balanceColumn}>
+                          <Text style={styles.balanceLabel}>Start</Text>
+                          <Text style={styles.balanceValue}>${starting}</Text>
+                        </View>
+                        <View style={styles.balanceColumn}>
+                          <Text style={styles.balanceLabel}>End</Text>
+                          <Text style={styles.balanceValue}>${ending}</Text>
+                        </View>
+                        <View style={styles.balanceColumn}>
+                          <Text style={styles.balanceLabel}>Min</Text>
+                          <Text style={styles.balanceValue}>${min}</Text>
+                        </View>
+                        <View style={styles.balanceColumn}>
+                          <Text style={styles.balanceLabel}>Max</Text>
+                          <Text style={styles.balanceValue}>${max}</Text>
+                        </View>
                       </View>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>End</Text>
-                        <Text style={styles.balanceValue}>${ending}</Text>
-                      </View>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>Min</Text>
-                        <Text style={styles.balanceValue}>${min}</Text>
-                      </View>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>Max</Text>
-                        <Text style={styles.balanceValue}>${max}</Text>
-                      </View>
+                      <LineChart
+                        data={{
+                          labels: monthDays.map(d => d.slice(-2)),
+                          datasets: [{ data: dailyBalances }]
+                        }}
+                        width={Dimensions.get('window').width - 40}
+                        height={160}
+                        chartConfig={{
+                          backgroundColor: '#fff',
+                          backgroundGradientFrom: '#fff',
+                          backgroundGradientTo: '#fff',
+                          decimalPlaces: 2,
+                          color: () => '#007AFF',
+                          labelColor: () => '#999',
+                          propsForDots: { r: '2' }
+                        }}
+                        bezier
+                        style={{ marginVertical: 8, borderRadius: 8 }}
+                      />
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })}
             </View>
           );
-        }}
-      />
+        })}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, paddingBottom: 64, paddingTop: 64 },
+  container: { padding: 16, flex: 1, paddingBottom: 64, paddingTop: 16 },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   empty: { marginBottom: 20, color: 'gray' },
   accountCard: {
@@ -183,5 +266,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600'
   },
+  accordionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#eee',
+    borderRadius: 4
+  },
 });
-  

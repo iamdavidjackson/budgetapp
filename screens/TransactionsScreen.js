@@ -124,7 +124,7 @@ export default function TransactionsScreen() {
                         <View>
                           <Text style={styles.transactionName}>{item.name}</Text>
                           <Text style={styles.transactionDetails}>
-                            {item.date} -{' '}
+                            {(state.accounts.find(acc => acc.id === item.accountId) || {}).name || ''} • {item.date} -{' '}
                             {item.confirmed && item.amount && parseFloat(item.amount) !== parseFloat(item.forecastedAmount) ? (
                               <>
                                 <Text style={styles.strikethrough}>${item.forecastedAmount}</Text>{' '}
