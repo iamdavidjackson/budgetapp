@@ -9,6 +9,7 @@ import AccountsStack from './navigation/AccountsStack';
 import RecurringStack from './navigation/RecurringStack';
 import HomeStack from './navigation/HomeStack';
 import TransactionsStack from './navigation/TransactionsStack';
+import SettingsStack from './navigation/SettingsStack';
 
 const Tab = createBottomTabNavigator();
 
@@ -36,6 +37,9 @@ export default function App() {
                   case 'Accounts':
                     iconName = 'account-balance-wallet';
                     break;
+                  case 'Settings':
+                    iconName = 'settings';
+                    break;
                   default:
                     iconName = 'circle';
                 }
@@ -48,6 +52,7 @@ export default function App() {
             <Tab.Screen name="Transactions" component={TransactionsStack} />
             <Tab.Screen name="Recurring" component={RecurringStack} />
             <Tab.Screen name="Accounts" component={AccountsStack} />
+            <Tab.Screen name="Settings" component={SettingsStack} />
           </Tab.Navigator>
         </NavigationContainer>
       </BudgetProvider>

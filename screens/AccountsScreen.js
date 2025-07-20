@@ -31,7 +31,7 @@ export default function AccountsScreen({ navigation }) {
     return (
       <Swipeable renderRightActions={() => renderRightActions(item)}>
         <Pressable
-          onPress={() => navigation.navigate('Add Account', { accountId: item.id })}
+          onPress={() => navigation.navigate('Account Details', { accountId: item.id })}
           style={styles.accountCard}
         >
           <View style={styles.cardRow}>

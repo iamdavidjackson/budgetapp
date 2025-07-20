@@ -1,58 +1,13 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, Dimensions } from 'react-native';
 import { BudgetContext } from '../context/BudgetContext';
-import { generateForecast } from '../utils/forecastUtils';
-import { addMonths, format, parseISO } from 'date-fns';
+import { addMonths, format } from 'date-fns';
 import { RectButton } from 'react-native-gesture-handler';
-import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 
 export default function HomeScreen() {
   const { state } = useContext(BudgetContext);
-  const navigation = useNavigation();
-
-  const forecastedItems = useMemo(() => {
-    const endDate = addMonths(new Date(), 12);
-    const forecast = generateForecast(state.recurring || [], endDate);
-
-    // Build a lookup for confirmed transactions
-    const transactionMap = new Map(
-      (state.transactions || []).map(
-        tx => [`${tx.sourceRecurringId}-${tx.date}`, true]
-      )
-    );
-
-    const grouped = forecast.reduce((acc, tx) => {
-      const month = format(parseISO(tx.date), 'MMMM yyyy');
-      if (!acc[month]) acc[month] = [];
-      acc[month].push(tx);
-      return acc;
-    }, {});
-
-    const result = [];
-    Object.entries(grouped).forEach(([month, txs]) => {
-      result.push({ type: 'divider', month });
-      txs.forEach(tx => {
-        const key = `${tx.sourceRecurringId}-${tx.date}`;
-        const confirmed = transactionMap.has(key);
-        result.push({ type: 'transaction', ...tx, confirmed });
-      });
-    });
-
-    return result;
-  }, [state.recurring, state.transactions]);
-
-  const renderRightActions = (item) => (
-    <RectButton
-      style={styles.swipeButton}
-      onPress={() => navigation.navigate('Confirm Transaction', {
-        forecastedTransaction: item
-      })}
-    >
-      <Text style={styles.swipeText}>Confirm</Text>
-    </RectButton>
-  );
 
   // State for expanded months (first month expanded by default)
   const firstMonth = format(addMonths(new Date(), 0), 'MMMM yyyy');
@@ -98,46 +53,54 @@ export default function HomeScreen() {
                       new Date(tx.date) >= monthStart &&
                       new Date(tx.date) <= monthEnd
                   );
-                  let starting = previousEndingBalances.get(account.id) ?? 2000;
-                  let current = starting;
-                  let min = current;
-                  let max = current;
 
-                  filtered
-                    .sort((a, b) => new Date(a.date) - new Date(b.date))
-                    .forEach(tx => {
-                      const amount = parseFloat(tx.amount || tx.forecastedAmount || 0);
-                      const isIncome = tx.type === 'income';
-                      const delta = isIncome ? amount : -amount;
-                      current += delta;
-                      min = Math.min(min, current);
-                      max = Math.max(max, current);
-                    });
+                  const overrideDateKey = format(monthStart, 'yyyy-MM-dd');
+                  const accountOverrides = (state.balanceOverrides || []).filter(
+                    o => o.accountId === account.id && o.date === overrideDateKey
+                  );
 
-                  const ending = current;
-                  previousEndingBalances.set(account.id, ending);
-
-                  const monthDays = [];
-                  const monthStartDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
                   const numDays = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-                  for (let i = 0; i < numDays; i++) {
-                    const date = new Date(monthStartDate);
-                    date.setDate(date.getDate() + i);
-                    monthDays.push(format(date, 'yyyy-MM-dd'));
-                  }
+                  const monthDays = Array.from({ length: numDays }, (_, i) =>
+                    format(new Date(monthDate.getFullYear(), monthDate.getMonth(), i + 1), 'yyyy-MM-dd')
+                  );
+
+                  let starting = accountOverrides.length > 0
+                    ? parseFloat(accountOverrides[0].amount)
+                    : previousEndingBalances.get(account.id) ?? 2000;
 
                   let balance = starting;
-                  const dailyBalances = [];
+                  const dailyBalances = [balance];
 
-                  monthDays.forEach(day => {
+                  monthDays.slice(1).forEach(day => {
                     const dailyTxs = filtered.filter(tx => format(new Date(tx.date), 'yyyy-MM-dd') === day);
                     dailyTxs.forEach(tx => {
                       const amount = parseFloat(tx.amount || tx.forecastedAmount || 0);
                       const delta = tx.type === 'income' ? amount : -amount;
                       balance += delta;
+
+                      // Apply transfer destination side
+                      if (tx.type === 'transfer' && tx.transferToAccountId) {
+                        const transferToId = tx.transferToAccountId;
+                        const prevBal = previousEndingBalances.get(transferToId) ?? 2000;
+                        const updatedBal = prevBal + amount;
+                        previousEndingBalances.set(transferToId, updatedBal);
+                      }
                     });
+
+                    const override = (state.balanceOverrides || []).find(
+                      o => o.accountId === account.id && o.date === day
+                    );
+                    if (override) {
+                      balance = parseFloat(override.amount);
+                    }
+
                     dailyBalances.push(balance);
                   });
+
+                  const min = Math.min(...dailyBalances);
+                  const max = Math.max(...dailyBalances);
+                  const ending = dailyBalances[dailyBalances.length - 1];
+                  previousEndingBalances.set(account.id, ending);
 
                   return (
                     <View key={account.id} style={styles.accountCard}>
@@ -145,40 +108,57 @@ export default function HomeScreen() {
                       <View style={styles.balanceRow}>
                         <View style={styles.balanceColumn}>
                           <Text style={styles.balanceLabel}>Start</Text>
-                          <Text style={styles.balanceValue}>${starting}</Text>
+                          <Text style={styles.balanceValue}>${Math.round(starting)}</Text>
                         </View>
                         <View style={styles.balanceColumn}>
                           <Text style={styles.balanceLabel}>End</Text>
-                          <Text style={styles.balanceValue}>${ending}</Text>
+                          <Text style={styles.balanceValue}>${Math.round(ending)}</Text>
                         </View>
                         <View style={styles.balanceColumn}>
                           <Text style={styles.balanceLabel}>Min</Text>
-                          <Text style={styles.balanceValue}>${min}</Text>
+                          <Text style={styles.balanceValue}>${Math.round(min)}</Text>
                         </View>
                         <View style={styles.balanceColumn}>
                           <Text style={styles.balanceLabel}>Max</Text>
-                          <Text style={styles.balanceValue}>${max}</Text>
+                          <Text style={styles.balanceValue}>${Math.round(max)}</Text>
                         </View>
                       </View>
-                      <LineChart
-                        data={{
-                          labels: monthDays.map(d => d.slice(-2)),
-                          datasets: [{ data: dailyBalances }]
-                        }}
-                        width={Dimensions.get('window').width - 40}
-                        height={160}
-                        chartConfig={{
-                          backgroundColor: '#fff',
-                          backgroundGradientFrom: '#fff',
-                          backgroundGradientTo: '#fff',
-                          decimalPlaces: 2,
-                          color: () => '#007AFF',
-                          labelColor: () => '#999',
-                          propsForDots: { r: '2' }
-                        }}
-                        bezier
-                        style={{ marginVertical: 8, borderRadius: 8 }}
-                      />
+                      <View style={styles.chartContainer}>
+                        <LineChart
+                          data={{
+                            labels: monthDays.map((d, index) => {
+                              const showEvery = Math.ceil(monthDays.length / 10);
+                              return index % showEvery === 0 ? d.slice(-2) : '';
+                            }),
+                            datasets: [{ data: dailyBalances }]
+                          }}
+                          width={Dimensions.get('window').width - 60}
+                          height={160}
+                          chartConfig={{
+                            backgroundColor: '#fff',
+                            backgroundGradientFrom: '#fff',
+                            backgroundGradientTo: '#fff',
+                            decimalPlaces: 0,
+                            color: () => '#007AFF',
+                            labelColor: () => '#999',
+                            formatYLabel: (yValue) => parseInt(yValue).toString(),
+                            propsForDots: { r: '2' },
+                            propsForBackgroundLines: {
+                              stroke: '#eee',
+                              strokeDasharray: '', // solid line
+                              strokeWidth: 1
+                            },
+                            propsForVerticalLabels: {
+                              opacity: 1
+                            },
+                            propsForHorizontalLabels: {
+                              opacity: 1
+                            }
+                          }}
+                          bezier
+                          style={{ marginVertical: 8, borderRadius: 8 }}
+                        />
+                      </View>
                     </View>
                   );
                 })}
@@ -274,5 +254,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: '#eee',
     borderRadius: 4
+  },
+  chartContainer: {
+    backgroundColor: '#fff',
+    padding: 10,
+    paddingLeft: 0,
+    borderRadius: 8,
+    marginTop: 10
   },
 });

@@ -146,12 +146,6 @@ export default function TransactionsScreen() {
             }}
           />
         )}
-        {/* <TouchableOpacity
-          style={styles.deleteAllButton}
-          onPress={() => dispatch({ type: 'DELETE_ALL_TRANSACTIONS' })}
-        >
-          <Text style={styles.deleteAllText}>Delete All Transactions</Text>
-        </TouchableOpacity> */}
       </View>
     </View>
   );

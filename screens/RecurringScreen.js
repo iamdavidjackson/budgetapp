@@ -64,7 +64,6 @@ export default function RecurringScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 16, flex: 1, paddingBottom: 64, paddingTop: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   empty: { marginBottom: 20, color: 'gray' },
   item: {
     backgroundColor: '#fff',

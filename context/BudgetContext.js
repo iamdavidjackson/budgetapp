@@ -8,11 +8,37 @@ const initialState = {
   accounts: [],
   transactions: [],
   recurring: [],
-  forecasted: []
+  forecasted: [],
+  balanceOverrides: []
 };
 
 function reducer(state, action) {
   switch (action.type) {
+    case 'SET_ACCOUNTS':
+      return {
+        ...state,
+        accounts: action.payload
+      };
+    case 'SET_TRANSACTIONS':
+      return {
+        ...state,
+        transactions: action.payload
+      };
+    case 'SET_RECURRING':
+      return {
+        ...state,
+        recurring: action.payload
+      };
+    case 'SET_FORECASTED':
+      return {
+        ...state,
+        forecasted: action.payload
+      };
+    case 'SET_BALANCE_OVERRIDES':
+      return {
+        ...state,
+        balanceOverrides: action.payload
+      };
     case 'ADD_ACCOUNT':
       return {
         ...state,
@@ -133,6 +159,18 @@ function reducer(state, action) {
         ...state,
         recurring: []
       };
+    case 'ADD_BALANCE_OVERRIDE':
+      return {
+        ...state,
+        balanceOverrides: [...state.balanceOverrides, action.payload]
+      };
+    case 'REMOVE_BALANCE_OVERRIDE':
+      return {
+        ...state,
+        balanceOverrides: state.balanceOverrides.filter(
+          o => !(o.accountId === action.payload.accountId && o.date === action.payload.date)
+        )
+      };
     default:
       return state;
   }
@@ -141,7 +179,7 @@ function reducer(state, action) {
 export const BudgetProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Load accounts, transactions, and recurring items from AsyncStorage on mount
+  // Load accounts, transactions, recurring items, and balance overrides from AsyncStorage on mount
   useEffect(() => {
     const loadAccounts = async () => {
       try {
@@ -192,6 +230,22 @@ export const BudgetProvider = ({ children }) => {
       }
     };
     loadRecurring();
+
+    // Load balance overrides
+    const loadOverrides = async () => {
+      try {
+        const json = await AsyncStorage.getItem('balanceOverrides');
+        if (json) {
+          const saved = JSON.parse(json);
+          saved.forEach(item => {
+            dispatch({ type: 'ADD_BALANCE_OVERRIDE', payload: item });
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load balance overrides', e);
+      }
+    };
+    loadOverrides();
   }, []);
 
   // Save accounts to AsyncStorage whenever they change
@@ -229,6 +283,18 @@ export const BudgetProvider = ({ children }) => {
     };
     saveRecurring();
   }, [state.recurring]);
+
+  // Save balance overrides to AsyncStorage whenever they change
+  useEffect(() => {
+    const saveOverrides = async () => {
+      try {
+        await AsyncStorage.setItem('balanceOverrides', JSON.stringify(state.balanceOverrides));
+      } catch (e) {
+        console.error('Failed to save balance overrides', e);
+      }
+    };
+    saveOverrides();
+  }, [state.balanceOverrides]);
   
   return (
     <BudgetContext.Provider value={{ state, dispatch }}>
