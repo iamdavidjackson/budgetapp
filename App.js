@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BudgetProvider } from './context/BudgetContext';
+import { supabase } from './utils/supabase';
+import AuthScreen from './screens/AuthScreen';
 
 import AccountsStack from './navigation/AccountsStack';
 import RecurringStack from './navigation/RecurringStack';
@@ -14,6 +16,26 @@ import SettingsStack from './navigation/SettingsStack';
 const Tab = createBottomTabNavigator();
 
 export default function App() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const session = supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BudgetProvider>
