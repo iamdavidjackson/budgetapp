@@ -1,24 +1,46 @@
-import React, { useContext } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useContext, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { BudgetContext } from '../context/BudgetContext';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { supabase } from '../utils/supabase';
 
 const AccountDetailsScreen = () => {
   const { state, dispatch } = useContext(BudgetContext);
   const route = useRoute();
   const navigation = useNavigation();
   const { accountId } = route.params;
+  const [loading, setLoading] = useState(false);
 
   const account = state.accounts.find(acc => acc.id === accountId);
   const overrides = state.balanceOverrides
     .filter(o => o.accountId === accountId)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  const handleDelete = (date) => {
-    dispatch({ type: 'REMOVE_BALANCE_OVERRIDE', payload: { accountId, date } });
+  const handleDelete = async (date) => {
+    setLoading(true);
+    const { error } = await supabase
+      .from('balances')
+      .delete()
+      .eq('account_id', accountId)
+      .eq('date', date);
+
+    if (!error) {
+      dispatch({ type: 'REMOVE_BALANCE_OVERRIDE', payload: { accountId, date } });
+    } else {
+      console.error('Failed to delete balance override:', error.message);
+    }
+    setLoading(false);
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   const renderRightActions = (item) => (
     <TouchableOpacity
@@ -40,7 +62,7 @@ const AccountDetailsScreen = () => {
       <View style={styles.headerRow}>
         <Text style={styles.sectionHeader}>Balance Overrides</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate('Balance Override', { accountId })}
+          onPress={() => navigation.navigate('Balance Override', { accountId, accountName: account?.name })}
         >
           <MaterialIcons name="add" size={24} color="black" />
         </TouchableOpacity>
@@ -122,6 +144,11 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center'
   }
 });

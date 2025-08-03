@@ -1,46 +1,85 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import React, { useState, useContext, useEffect } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, Platform, Switch } from 'react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import { format } from 'date-fns';
 import { BudgetContext } from '../context/BudgetContext';
+import { supabase } from '../utils/supabase';
 
 export default function ConfirmTransactionFormScreen({ route, navigation }) {
-  const { forecastedTransaction: forecast } = route.params;
+  const { forecastedTransaction } = route.params;
   const { dispatch } = useContext(BudgetContext);
 
-  const [actualAmount, setActualAmount] = useState(forecast.amount?.toString() || '');
+  const [transactionData, setTransactionData] = useState(null);
+  const [actualAmount, setActualAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [date, setDate] = useState(new Date());
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
-  const handleConfirm = () => {
-    if (!actualAmount.trim()) return;
+  useEffect(() => {
+    const fetchTransaction = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', forecastedTransaction.id)
+        .single();
 
-    dispatch({
-      type: 'ADD_TRANSACTION',
-      payload: {
-        id: Date.now().toString(),
-        name: forecast.name,
-        date: forecast.date,
-        amount: parseFloat(actualAmount),
-        forecastedAmount: forecast.amount,
-        category: forecast.category,
-        type: forecast.type,
-        accountId: forecast.accountId,
-        transferToAccountId: forecast.transferToAccountId,
-        sourceRecurringId: forecast.sourceRecurringId,
-        forecastId: forecast.id,
+      if (!error && data) {
+        setTransactionData(data);
+        setActualAmount(data.amount?.toString() || '');
+        if (data.date) {
+          setDate(new Date(data.date));
+        }
+        setConfirmed(!data.forecasted);
       }
-    });
+      setLoading(false);
+    };
 
-    navigation.goBack();
+    fetchTransaction();
+  }, [forecastedTransaction]);
+
+  const handleConfirm = async () => {
+    if (!actualAmount.trim() || !transactionData) return;
+    setLoading(true);
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        amount: confirmed ? parseFloat(actualAmount) : null,
+        forecasted: !confirmed,
+        date: date.toISOString().split('T')[0]
+      })
+      .eq('id', transactionData.id);
+
+    setLoading(false);
+    if (!error) {
+      navigation.goBack();
+    } else {
+      console.error('Error updating transaction:', error);
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Name</Text>
-      <Text style={styles.value}>{forecast.name}</Text>
+      <Text style={styles.value}>{transactionData?.description}</Text>
 
       <Text style={styles.label}>Date</Text>
-      <Text style={styles.value}>{forecast.date}</Text>
+      <Text style={styles.value}>{transactionData?.forecasted_date}</Text>
 
       <Text style={styles.label}>Forecasted Amount</Text>
-      <Text style={styles.value}>${parseFloat(forecast.amount).toFixed(2)}</Text>
+      <Text style={styles.value}>${parseFloat(transactionData?.forecasted_amount || 0).toFixed(2)}</Text>
+
+      <Text style={styles.label}>Confirmed</Text>
+      <Switch value={confirmed} onValueChange={setConfirmed} />
 
       <Text style={styles.label}>Actual Amount</Text>
       <TextInput
@@ -49,6 +88,37 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
         onChangeText={setActualAmount}
         keyboardType="decimal-pad"
       />
+
+      <Text style={styles.label}>Actual Date</Text>
+      {Platform.OS === 'web' ? (
+        <input
+          type="date"
+          value={format(date, 'yyyy-MM-dd')}
+          onChange={(e) => setDate(new Date(e.target.value))}
+          style={{
+            padding: 8,
+            borderRadius: 4,
+            borderWidth: 1,
+            borderColor: '#ccc',
+            marginTop: 8,
+            fontSize: 16,
+          }}
+        />
+      ) : (
+        <>
+          <Button title={format(date, 'yyyy-MM-dd')} onPress={() => setDatePickerVisible(true)} />
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
+            mode="date"
+            date={date}
+            onConfirm={(selectedDate) => {
+              setDatePickerVisible(false);
+              setDate(selectedDate);
+            }}
+            onCancel={() => setDatePickerVisible(false)}
+          />
+        </>
+      )}
 
       <Button title="Confirm Transaction" onPress={handleConfirm} />
     </View>

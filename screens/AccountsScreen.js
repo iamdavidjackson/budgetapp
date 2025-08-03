@@ -1,10 +1,29 @@
 import React, { useContext, useLayoutEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { supabase } from '../utils/supabase';
 import { ScrollView, View, Text, Button, FlatList, StyleSheet, Pressable } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { BudgetContext } from '../context/BudgetContext';
 
 export default function AccountsScreen({ navigation }) {
   const { state, dispatch } = useContext(BudgetContext);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchAccounts = async () => {
+        const { data, error } = await supabase.from('accounts').select('*').order('created_at');
+        if (error) {
+          console.error('Error loading accounts:', error);
+          return;
+        }
+        dispatch({ type: 'SET_ACCOUNTS', payload: data });
+      };
+
+      fetchAccounts();
+    }, [dispatch])
+  );
+
   const accounts = state.accounts || [];
 
   useLayoutEffect(() => {
@@ -17,7 +36,12 @@ export default function AccountsScreen({ navigation }) {
     });
   }, [navigation]);
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+    const { error } = await supabase.from('accounts').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting account from Supabase:', error);
+      return;
+    }
     dispatch({ type: 'DELETE_ACCOUNT', payload: id });
   };
 

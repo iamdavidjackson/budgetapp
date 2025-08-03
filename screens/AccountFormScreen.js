@@ -1,5 +1,6 @@
+import { supabase } from '../utils/supabase';
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { BudgetContext } from '../context/BudgetContext';
 
@@ -10,26 +11,66 @@ export default function AccountFormScreen({ navigation, route }) {
 
   const [name, setName] = useState(account?.name || '');
   const [type, setType] = useState(account?.type || 'bank');
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     if (!name.trim()) {
       Alert.alert('Validation', 'Account name is required.');
       return;
     }
 
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
     const updatedAccount = {
-      id: accountId || Date.now().toString(),
       name,
-      type
+      type,
+      user_id: user.id
     };
 
-    dispatch({
-      type: accountId ? 'UPDATE_ACCOUNT' : 'ADD_ACCOUNT',
-      payload: updatedAccount
-    });
+    try {
+      if (accountId) {
+        const { error } = await supabase
+          .from('accounts')
+          .update(updatedAccount)
+          .eq('id', accountId);
 
-    navigation.goBack();
+        if (error) throw error;
+
+        dispatch({
+          type: 'UPDATE_ACCOUNT',
+          payload: { id: accountId, ...updatedAccount }
+        });
+      } else {
+        const { data, error } = await supabase
+          .from('accounts')
+          .insert(updatedAccount)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        dispatch({
+          type: 'ADD_ACCOUNT',
+          payload: data
+        });
+      }
+
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -60,5 +101,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderRadius: 4
   },
-  button: { marginTop: 24 }
+  button: { marginTop: 24 },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
 });
