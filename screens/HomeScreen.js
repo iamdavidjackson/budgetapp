@@ -1,13 +1,50 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { ScrollView, View, Text, StyleSheet, Dimensions } from 'react-native';
 import { BudgetContext } from '../context/BudgetContext';
-import { addMonths, format } from 'date-fns';
+import { addMonths, format, startOfDay, endOfDay } from 'date-fns';
 import { RectButton } from 'react-native-gesture-handler';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
+import { supabase } from '../utils/supabase';
 
 export default function HomeScreen() {
   const { state } = useContext(BudgetContext);
+
+  const [transactions, setTransactions] = useState([]);
+  const [balanceOverrides, setBalanceOverrides] = useState([]);
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('forecasted_date', { ascending: true });
+
+      if (!error) {
+        setTransactions(data);
+      } else {
+        console.error('Error fetching transactions', error);
+      }
+    };
+
+    fetchTransactions();
+  }, []);
+
+  useEffect(() => {
+    const fetchOverrides = async () => {
+      const { data, error } = await supabase
+        .from('balances')
+        .select('*');
+
+      if (!error) {
+        setBalanceOverrides(data);
+      } else {
+        console.error('Error fetching balance overrides', error);
+      }
+    };
+
+    fetchOverrides();
+  }, []);
 
   // State for expanded months (first month expanded by default)
   const firstMonth = format(addMonths(new Date(), 0), 'MMMM yyyy');
@@ -44,19 +81,19 @@ export default function HomeScreen() {
               </RectButton>
               {expanded &&
                 (state.accounts || []).map((account) => {
-                  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-                  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-                  const allTx = [...(state.transactions || []), ...(state.forecasted || [])];
+                  const monthStart = startOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
+                  const monthEnd = endOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
+                  const allTx = [...transactions];
                   const filtered = allTx.filter(
                     tx =>
-                      (tx.accountId === account.id || tx.transferToAccountId === account.id) &&
+                      (tx.account_id === account.id || tx.secondary_account_id === account.id) &&
                       new Date(tx.date) >= monthStart &&
                       new Date(tx.date) <= monthEnd
                   );
 
                   const overrideDateKey = format(monthStart, 'yyyy-MM-dd');
-                  const accountOverrides = (state.balanceOverrides || []).filter(
-                    o => o.accountId === account.id && o.date === overrideDateKey
+                  const accountOverrides = (balanceOverrides || []).filter(
+                    o => o.account_id === account.id && o.date === overrideDateKey
                   );
 
                   const numDays = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
@@ -74,7 +111,7 @@ export default function HomeScreen() {
                   monthDays.slice(1).forEach(day => {
                     const dailyTxs = filtered.filter(tx => format(new Date(tx.date), 'yyyy-MM-dd') === day);
                     dailyTxs.forEach(tx => {
-                      const amount = parseFloat(tx.amount || tx.forecastedAmount || 0);
+                      const amount = parseFloat(tx.amount || tx.forecasted_amount || 0);
                       let delta = 0;
 
                       if (tx.type === 'income') {
@@ -82,9 +119,9 @@ export default function HomeScreen() {
                       } else if (tx.type === 'expense') {
                         delta = -amount;
                       } else if (tx.type === 'transfer') {
-                        if (tx.accountId === account.id) {
+                        if (tx.account_id === account.id) {
                           delta = -amount; // transfer out
-                        } else if (tx.transferToAccountId === account.id) {
+                        } else if (tx.secondary_account_id === account.id) {
                           delta = amount; // transfer in
                         }
                       }
@@ -92,8 +129,8 @@ export default function HomeScreen() {
                       balance += delta;
                     });
 
-                    const override = (state.balanceOverrides || []).find(
-                      o => o.accountId === account.id && o.date === day
+                    const override = (balanceOverrides || []).find(
+                      o => o.account_id === account.id && o.date === day
                     );
                     if (override) {
                       balance = parseFloat(override.amount);

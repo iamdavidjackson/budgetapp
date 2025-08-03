@@ -1,44 +1,39 @@
-import React, { useContext, useMemo, useState, useEffect, useLayoutEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TouchableOpacity } from 'react-native';
+import React, { useContext, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { BudgetContext } from '../context/BudgetContext';
-import { addMonths, format, parseISO, parse } from 'date-fns';
-import { generateForecast } from '../utils/forecastUtils';
+import { format, parseISO, parse } from 'date-fns';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
-import { useNavigation } from '@react-navigation/native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { supabase } from '../utils/supabase';
 
 export default function TransactionsScreen() {
   const { state, dispatch } = useContext(BudgetContext);
   const navigation = useNavigation();
-  const [locallyConfirmed, setLocallyConfirmed] = useState(new Set());
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Pressable onPress={() => {
-          dispatch({
-            type: 'GENERATE_FORECASTED_ITEMS',
-            payload: {
-              generateForecast,
-              endDate: addMonths(new Date(), 12)
-            }
-          });
-        }}>
-          <Ionicons name="refresh" size={28} color="#007AFF" />
-        </Pressable>
-      )
-    });
-  }, [navigation, dispatch]);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchTransactions = async () => {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('forecasted_date', { ascending: true });
 
-  const forecastedItems = useMemo(() => {
-    const transactionMap = new Map(
-      (state.transactions || []).map(
-        tx => [`${tx.sourceRecurringId}-${tx.date}`, true]
-      )
-    );
+        if (error) {
+          console.error('Error fetching transactions:', error);
+        } else {
+          dispatch({ type: 'SET_TRANSACTIONS', payload: data });
+        }
+      };
 
-    const grouped = (state.forecasted || []).reduce((acc, tx) => {
-      const month = format(parseISO(tx.date), 'MMMM yyyy');
+      fetchTransactions();
+    }, [dispatch])
+  );
+
+  const transactions = useMemo(() => {
+    const grouped = (state.transactions || []).reduce((acc, tx) => {
+      const month = format(parseISO(tx.forecasted_date), 'MMMM yyyy');
       if (!acc[month]) acc[month] = [];
       acc[month].push(tx);
       return acc;
@@ -54,21 +49,17 @@ export default function TransactionsScreen() {
       .forEach(([month, txs]) => {
         result.push({ type: 'divider', month });
         txs
-          .sort((a, b) => new Date(a.date) - new Date(b.date))
+          .sort((a, b) => new Date(a.forecasted_date) - new Date(b.forecasted_date))
           .forEach(tx => {
-            const key = `${tx.sourceRecurringId}-${tx.date}`;
-            const confirmed = transactionMap.has(key);
-            const transaction = state.transactions.find(t => t.sourceRecurringId === tx.sourceRecurringId && t.date === tx.date);
-            const locally = locallyConfirmed.has(key);
-            result.push({ type: 'transaction', ...tx, ...transaction, confirmed: confirmed || locally });
+            result.push({ type: 'transaction', ...tx });
           });
       });
+
     return result;
-  }, [state.forecasted, state.transactions, locallyConfirmed]);
+  }, [state.transactions]);
 
   const renderRightActions = (item) => {
-    const key = `${item.sourceRecurringId}-${item.date}`;
-    if (!item.confirmed && !locallyConfirmed.has(key)) return null;
+    if (!item.forecasted) return null;
 
     return (
       <RectButton
@@ -76,12 +67,7 @@ export default function TransactionsScreen() {
         onPress={() => {
           dispatch({
             type: 'DELETE_TRANSACTION',
-            payload: { sourceRecurringId: item.sourceRecurringId, date: item.date }
-          });
-          setLocallyConfirmed(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(key);
-            return newSet;
+            payload: { id: item.id }
           });
         }}
       >
@@ -93,14 +79,12 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.container}>
       <View style={{ flex: 1 }}>
-        {forecastedItems.length === 0 ? (
+        {transactions.length === 0 ? (
           <Text style={styles.empty}>No forecasted transactions.</Text>
         ) : (
           <FlatList
-            data={forecastedItems}
-            keyExtractor={(item, idx) =>
-              item.type === 'divider' ? `divider-${item.month}` : item.id
-            }
+            data={transactions}
+            keyExtractor={(item) => item.id}
             renderItem={({ item }) => {
               if (item.type === 'divider') {
                 return <Text style={styles.divider}>{item.month}</Text>;
@@ -113,29 +97,27 @@ export default function TransactionsScreen() {
                         forecastedTransaction: item
                       })
                     }
-                    enabled={!item.confirmed}
                     style={[
-                      styles.transactionCard,
-                      item.confirmed && { opacity: 0.5 }
+                      styles.transactionCard
                     ]}
                   >
                     <View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
-                          <Text style={styles.transactionName}>{item.name}</Text>
+                          <Text style={styles.transactionName}>{item.description}</Text>
                           <Text style={styles.transactionDetails}>
-                            {(state.accounts.find(acc => acc.id === item.accountId) || {}).name || ''} • {item.date} -{' '}
-                            {item.confirmed && item.amount && parseFloat(item.amount) !== parseFloat(item.forecastedAmount) ? (
+                            {(state.accounts.find(acc => acc.id === item.account_id) || {}).name || ''} • {item.forecasted_date} -{' '}
+                            {!item.forecasted && item.amount && parseFloat(item.amount) !== parseFloat(item.forecasted_amount) ? (
                               <>
-                                <Text style={styles.strikethrough}>${item.forecastedAmount}</Text>{' '}
+                                <Text style={styles.strikethrough}>${item.forecasted_amount}</Text>{' '}
                                 <Text>${parseFloat(item.amount).toFixed(2)}</Text>
                               </>
                             ) : (
-                              `$${parseFloat(item.amount ?? item.forecastedAmount).toFixed(2)}`
+                              `$${parseFloat(item.amount ?? item.forecasted_amount).toFixed(2)}`
                             )}
                           </Text>
                         </View>
-                        {item.confirmed && (
+                        {!item.forecasted && (
                           <MaterialIcons name="check-circle" size={24} color="green" />
                         )}
                       </View>

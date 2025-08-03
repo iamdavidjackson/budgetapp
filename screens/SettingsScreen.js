@@ -5,8 +5,12 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { BudgetContext } from '../context/BudgetContext';
 
+import { supabase } from '../utils/supabase';
+import { useSession } from '@supabase/auth-helpers-react';
+
 const SettingsScreen = () => {
   const { state, dispatch } = useContext(BudgetContext);
+  const session = useSession();
 
   const arrayToCSV = (arr, keys) => {
     const header = keys.join(',');
@@ -24,22 +28,32 @@ const SettingsScreen = () => {
 
   const handleBackup = async () => {
     try {
+      const user = session?.user;
+      if (!user) {
+        Alert.alert('Error', 'User not authenticated.');
+        return;
+      }
+
       const parts = [];
 
-      parts.push('---ACCOUNTS---');
-      parts.push(arrayToCSV(state.accounts || [], ['id', 'name', 'type']));
+      const tables = [
+        { label: '---ACCOUNTS---', table: 'accounts', keys: ['id', 'name', 'type'] },
+        { label: '---TRANSACTIONS---', table: 'transactions', keys: ['id', 'description', 'date', 'amount', 'type', 'account_id', 'secondary_account_id', 'forecasted', 'forecasted_amount', 'forecasted_date', 'recurring_id'] },
+        { label: '---RECURRING---', table: 'recurring', keys: ['id', 'name', 'type', 'amount', 'frequency', 'start_date', 'end_date', 'account_id', 'secondary_account_id', 'weekend_policy', 'notes'] },
+        { label: '---BALANCES---', table: 'balances', keys: ['id', 'account_id', 'date', 'amount'] },
+      ];
 
-      parts.push('---TRANSACTIONS---');
-      parts.push(arrayToCSV(state.transactions || [], ['id', 'name', 'date', 'amount', 'type', 'accountId', 'forecastedTransactionId']));
+      for (const { label, table, keys } of tables) {
+        parts.push(label);
+        const { data, error } = await supabase
+          .from(table)
+          .select()
+          .eq('user_id', user.id);
 
-      parts.push('---FORECASTED---');
-      parts.push(arrayToCSV(state.forecasted || [], ['id', 'name', 'date', 'forecastedAmount', 'type', 'accountId', 'transactionId']));
+        if (error) throw error;
 
-      parts.push('---RECURRING---');
-      parts.push(arrayToCSV(state.recurring || [], ['id', 'name', 'type', 'amount', 'frequency', 'startDate', 'allowWeekends', 'accountId', 'targetAccountId']));
-
-      parts.push('---BALANCE_OVERRIDES---');
-      parts.push(arrayToCSV(state.balanceOverrides || [], ['id', 'accountId', 'date', 'amount']));
+        parts.push(arrayToCSV(data || [], keys));
+      }
 
       const backupContent = parts.join('\n\n');
       await saveAndShareCSV('backup.csv', backupContent);
@@ -66,6 +80,12 @@ const SettingsScreen = () => {
         encoding: FileSystem.EncodingType.UTF8
       });
 
+      const user = session?.user;
+      if (!user) {
+        Alert.alert('Error', 'User not authenticated.');
+        return;
+      }
+
       const sections = content.split('\n\n');
       const stateSlices = {};
 
@@ -74,21 +94,30 @@ const SettingsScreen = () => {
         const lines = sections[i + 1].split('\n').map(l => l.trim()).filter(Boolean);
 
         switch (label) {
-          case '---ACCOUNTS---':
-            stateSlices.accounts = parseCSVSection(lines, ['id', 'name', 'type']);
+          case '---ACCOUNTS---': {
+            const data = parseCSVSection(lines, ['id', 'name', 'type']).map(item => ({ ...item, user_id: user.id }));
+            await supabase.from('accounts').insert(data);
+            stateSlices.accounts = data;
             break;
-          case '---TRANSACTIONS---':
-            stateSlices.transactions = parseCSVSection(lines, ['id', 'name', 'date', 'amount', 'type', 'accountId', 'forecastedTransactionId']);
+          }
+          case '---TRANSACTIONS---': {
+            const data = parseCSVSection(lines, ['id', 'description', 'date', 'amount', 'type', 'account_id', 'secondary_account_id', 'forecasted', 'forecasted_amount', 'forecasted_date', 'recurring_id']).map(item => ({ ...item, user_id: user.id }));
+            await supabase.from('transactions').insert(data);
+            stateSlices.transactions = data;
             break;
-          case '---FORECASTED---':
-            stateSlices.forecasted = parseCSVSection(lines, ['id', 'name', 'date', 'forecastedAmount', 'type', 'accountId', 'transactionId']);
+          }
+          case '---RECURRING---': {
+            const data = parseCSVSection(lines, ['id', 'name', 'type', 'amount', 'frequency', 'start_date', 'end_date', 'account_id', 'secondary_account_id', 'weekend_policy', 'notes']).map(item => ({ ...item, user_id: user.id }));
+            await supabase.from('recurring').insert(data);
+            stateSlices.recurring = data;
             break;
-          case '---RECURRING---':
-            stateSlices.recurring = parseCSVSection(lines, ['id', 'name', 'type', 'amount', 'frequency', 'startDate', 'allowWeekends', 'accountId', 'targetAccountId']);
+          }
+          case '---BALANCES---': {
+            const data = parseCSVSection(lines, ['id', 'account_id', 'date', 'amount']).map(item => ({ ...item, user_id: user.id }));
+            await supabase.from('balances').insert(data);
+            stateSlices.balances = data;
             break;
-          case '---BALANCE_OVERRIDES---':
-            stateSlices.balanceOverrides = parseCSVSection(lines, ['id', 'accountId', 'date', 'amount']);
-            break;
+          }
         }
       }
 

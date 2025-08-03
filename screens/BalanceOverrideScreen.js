@@ -1,8 +1,9 @@
+import { supabase } from '../utils/supabase';
 
 
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Platform } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { View, Text, TextInput, Button, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { BudgetContext } from '../context/BudgetContext';
 import { format } from 'date-fns';
@@ -15,10 +16,42 @@ const BalanceOverrideScreen = () => {
 
   const [date, setDate] = useState(new Date());
   const [amount, setAmount] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
-  const handleSave = () => {
+  const showDatePicker = () => {
+    setDatePickerVisibility(true);
+  };
+
+  const hideDatePicker = () => {
+    setDatePickerVisibility(false);
+  };
+
+  const handleConfirm = (selectedDate) => {
+    setDate(selectedDate);
+    hideDatePicker();
+  };
+
+  const handleSave = async () => {
     if (!amount) return;
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error } = await supabase.from('balances').insert([
+      {
+        account_id: accountId,
+        date: format(date, 'yyyy-MM-dd'),
+        amount: parseFloat(amount),
+        user_id: user.id
+      }
+    ]);
+
+    if (error) {
+      console.error('Error saving balance to Supabase:', error);
+      setLoading(false);
+      return;
+    }
+
     dispatch({
       type: 'ADD_BALANCE_OVERRIDE',
       payload: {
@@ -27,23 +60,47 @@ const BalanceOverrideScreen = () => {
         amount: parseFloat(amount)
       }
     });
+
+    setLoading(false);
     navigation.goBack();
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Date</Text>
-      <Button title={format(date, 'yyyy-MM-dd')} onPress={() => setShowDatePicker(true)} />
-      {showDatePicker && (
-        <DateTimePicker
-          value={date}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) setDate(selectedDate);
+      {Platform.OS === 'web' ? (
+        <input
+          type="date"
+          value={format(date, 'yyyy-MM-dd')}
+          onChange={(e) => setDate(new Date(e.target.value))}
+          style={{
+            padding: 8,
+            borderRadius: 4,
+            borderWidth: 1,
+            borderColor: '#ccc',
+            marginTop: 8,
+            fontSize: 16,
           }}
         />
+      ) : (
+        <>
+          <Button title={format(date, 'yyyy-MM-dd')} onPress={showDatePicker} />
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
+            mode="date"
+            date={date}
+            onConfirm={handleConfirm}
+            onCancel={hideDatePicker}
+          />
+        </>
       )}
 
       <Text style={styles.label}>Amount</Text>
@@ -75,6 +132,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 4,
     marginTop: 8
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   }
 });
 

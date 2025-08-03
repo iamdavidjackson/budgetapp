@@ -1,13 +1,15 @@
-import React, { useContext, useLayoutEffect } from 'react';
+import React, { useContext, useLayoutEffect, useEffect, useState } from 'react';
 import { View, Text, Button, FlatList, Pressable, StyleSheet } from 'react-native';
 import { BudgetContext } from '../context/BudgetContext';
 import { useNavigation } from '@react-navigation/native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
+import { supabase } from '../utils/supabase';
 
 export default function RecurringScreen() {
-  const { state, dispatch } = useContext(BudgetContext);
+  const { dispatch } = useContext(BudgetContext);
   const navigation = useNavigation();
-  const recurringItems = state.recurring || [];
+  const [recurringItems, setRecurringItems] = useState([]);
+  const [loading, setLoading] = useState(false);
   
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -19,8 +21,63 @@ export default function RecurringScreen() {
     });
   }, [navigation]);
 
-  const handleDelete = (id) => {
-    dispatch({ type: 'DELETE_RECURRING_ITEM', payload: id });
+  useEffect(() => {
+    let subscription;
+    const fetchRecurringItems = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('recurring')
+        .select('*')
+        .order('start_date', { ascending: true });
+
+      if (error) {
+        console.error('Error loading recurring items:', error);
+      } else {
+        setRecurringItems(data);
+      }
+
+      setLoading(false);
+    };
+
+    fetchRecurringItems();
+
+    // Subscribe to real-time changes in recurring table
+    subscription = supabase
+      .channel('recurring-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'recurring' },
+        payload => {
+          setRecurringItems(prevItems => {
+            const existingIndex = prevItems.findIndex(item => item.id === payload.new?.id || item.id === payload.old?.id);
+            switch (payload.eventType) {
+              case 'INSERT':
+                return [...prevItems, payload.new];
+              case 'UPDATE':
+                if (existingIndex !== -1) {
+                  const updated = [...prevItems];
+                  updated[existingIndex] = payload.new;
+                  return updated;
+                }
+                return prevItems;
+              case 'DELETE':
+                return prevItems.filter(item => item.id !== payload.old.id);
+              default:
+                return prevItems;
+            }
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleDelete = async (id) => {
+    await supabase.from('recurring').delete().eq('id', id);
+    setRecurringItems(prev => prev.filter(item => item.id !== id));
   };
 
   const renderRightActions = (item) => (
@@ -53,7 +110,7 @@ export default function RecurringScreen() {
       ) : (
         <FlatList
           data={recurringItems}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 80 }}
         />
