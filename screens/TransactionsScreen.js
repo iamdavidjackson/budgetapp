@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { format, parseISO, parse } from 'date-fns';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { format, parseISO, parse, set } from 'date-fns';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,14 +10,16 @@ export default function TransactionsScreen() {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const navigation = useNavigation();
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       const fetchTransactions = async () => {
+        setLoading(true);
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('transactions')
           .select('*')
-          .order('forecasted_date', { ascending: true });
+          .order('date', { ascending: true });
 
         const { data: accountsData, error: accountsError } = await supabase
           .from('accounts')
@@ -34,6 +36,8 @@ export default function TransactionsScreen() {
         } else {
           setAccounts(accountsData);
         }
+
+        setLoading(false);
       };
 
       fetchTransactions();
@@ -75,6 +79,7 @@ export default function TransactionsScreen() {
         style={[styles.swipeButton, { backgroundColor: '#f44336' }]}
         onPress={async () => {
           try {
+            setLoading(true);
             const { error } = await supabase
               .from('transactions')
               .delete()
@@ -86,8 +91,10 @@ export default function TransactionsScreen() {
             }
 
             setTransactions(prev => prev.filter(tx => tx.id !== item.id));
+            setLoading(false);
           } catch (err) {
             console.error('Unexpected error deleting transaction:', err);
+            setLoading(false);
           }
         }}
       >
@@ -95,6 +102,14 @@ export default function TransactionsScreen() {
       </RectButton>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -251,5 +266,10 @@ const styles = StyleSheet.create({
   deleteAllText: {
     color: '#fff',
     fontWeight: 'bold'
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   }
 });

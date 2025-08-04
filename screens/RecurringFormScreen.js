@@ -290,7 +290,12 @@ export default function RecurringFormScreen({ navigation, route }) {
       <TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="numeric" />
 
       <Text style={styles.label}>Category</Text>
-      <TextInput style={styles.input} value={category} onChangeText={setCategory} />
+      <Picker selectedValue={category} onValueChange={setCategory}>
+        <Picker.Item label="Essential – Fixed (e.g. rent, salary)" value="essential_fixed" />
+        <Picker.Item label="Essential – Variable (e.g. groceries, utilities)" value="essential_variable" />
+        <Picker.Item label="Flexible – Regular but Optional (e.g. subscriptions)" value="flexible" />
+        <Picker.Item label="Discretionary – Optional (e.g. entertainment)" value="discretionary" />
+      </Picker>
 
       <Text style={styles.label}>Type</Text>
       <Picker selectedValue={type} onValueChange={setType}>

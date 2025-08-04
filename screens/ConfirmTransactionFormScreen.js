@@ -91,8 +91,11 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
       {Platform.OS === 'web' ? (
         <input
           type="date"
-          value={format(date, 'yyyy-MM-dd')}
-          onChange={(e) => setDate(new Date(e.target.value))}
+          value={date.toISOString().split('T')[0]}
+          onChange={(e) => {
+            const [year, month, day] = e.target.value.split('-').map(Number);
+            setDate(new Date(year, month - 1, day));
+          }}
           style={{
             padding: 8,
             borderRadius: 4,
