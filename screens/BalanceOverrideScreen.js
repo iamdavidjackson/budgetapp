@@ -1,15 +1,12 @@
-import { supabase } from '../utils/supabase';
-
-
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { BudgetContext } from '../context/BudgetContext';
 import { format } from 'date-fns';
 
+import { supabase } from '../utils/supabase';
+
 const BalanceOverrideScreen = () => {
-  const { dispatch } = useContext(BudgetContext);
   const route = useRoute();
   const navigation = useNavigation();
   const { accountId } = route.params;
@@ -51,15 +48,6 @@ const BalanceOverrideScreen = () => {
       setLoading(false);
       return;
     }
-
-    dispatch({
-      type: 'ADD_BALANCE_OVERRIDE',
-      payload: {
-        accountId,
-        date: format(date, 'yyyy-MM-dd'),
-        amount: parseFloat(amount)
-      }
-    });
 
     setLoading(false);
     navigation.goBack();

@@ -1,14 +1,12 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, Platform, Switch } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { format } from 'date-fns';
-import { BudgetContext } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
 
 export default function ConfirmTransactionFormScreen({ route, navigation }) {
   const { forecastedTransaction } = route.params;
-  const { dispatch } = useContext(BudgetContext);
-
+  
   const [transactionData, setTransactionData] = useState(null);
   const [actualAmount, setActualAmount] = useState('');
   const [loading, setLoading] = useState(false);

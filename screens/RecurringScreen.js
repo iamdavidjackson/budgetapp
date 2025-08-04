@@ -1,12 +1,10 @@
-import React, { useContext, useLayoutEffect, useEffect, useState } from 'react';
-import { View, Text, Button, FlatList, Pressable, StyleSheet } from 'react-native';
-import { BudgetContext } from '../context/BudgetContext';
+import React, { useLayoutEffect, useEffect, useState } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { supabase } from '../utils/supabase';
 
 export default function RecurringScreen() {
-  const { dispatch } = useContext(BudgetContext);
   const navigation = useNavigation();
   const [recurringItems, setRecurringItems] = useState([]);
   const [loading, setLoading] = useState(false);

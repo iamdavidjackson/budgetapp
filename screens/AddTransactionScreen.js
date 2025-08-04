@@ -1,20 +1,35 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, TextInput, Button, StyleSheet, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { BudgetContext } from '../context/BudgetContext';
+import { supabase } from '../utils/supabase';
 
 export default function AddTransactionScreen({ navigation }) {
-  const { state } = useContext(BudgetContext);
-  const accounts = state.accounts || [];
+  const [accounts, setAccounts] = useState([]);
 
   const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date());
-  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
-  const [transferToAccountId, setTransferToAccountId] = useState(accounts[1]?.id || '');
+  const [accountId, setAccountId] = useState('');
+  const [transferToAccountId, setTransferToAccountId] = useState('');
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      const { data, error } = await supabase.from('accounts').select('*');
+      if (error) {
+        console.error('Error fetching accounts:', error);
+      } else {
+        setAccounts(data);
+        if (!accountId && data.length > 0) {
+          setAccountId(data[0].id);
+        }
+      }
+    };
+    fetchAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
 

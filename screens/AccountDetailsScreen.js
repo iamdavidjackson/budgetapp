@@ -1,22 +1,50 @@
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { BudgetContext } from '../context/BudgetContext';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '../utils/supabase';
 
 const AccountDetailsScreen = () => {
-  const { state, dispatch } = useContext(BudgetContext);
+  const [account, setAccount] = useState(null);
+  const [overrides, setOverrides] = useState([]);
+  const [loading, setLoading] = useState(true);
   const route = useRoute();
   const navigation = useNavigation();
   const { accountId } = route.params;
-  const [loading, setLoading] = useState(false);
 
-  const account = state.accounts.find(acc => acc.id === accountId);
-  const overrides = state.balanceOverrides
-    .filter(o => o.accountId === accountId)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  React.useEffect(() => {
+    const fetchAccountData = async () => {
+      setLoading(true);
+      const { data: acc, error: accountError } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', accountId)
+        .single();
+
+      const { data: balanceData, error: balanceError } = await supabase
+        .from('balances')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('date', { ascending: true });
+
+      if (accountError) {
+        console.error('Error fetching account:', accountError.message);
+      } else {
+        setAccount(acc);
+      }
+
+      if (balanceError) {
+        console.error('Error fetching balances:', balanceError.message);
+      } else {
+        setOverrides(balanceData);
+      }
+
+      setLoading(false);
+    };
+
+    fetchAccountData();
+  }, [accountId]);
 
   const handleDelete = async (date) => {
     setLoading(true);
@@ -26,9 +54,7 @@ const AccountDetailsScreen = () => {
       .eq('account_id', accountId)
       .eq('date', date);
 
-    if (!error) {
-      dispatch({ type: 'REMOVE_BALANCE_OVERRIDE', payload: { accountId, date } });
-    } else {
+    if (error) {
       console.error('Failed to delete balance override:', error.message);
     }
     setLoading(false);

@@ -1,6 +1,5 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, StyleSheet, Dimensions } from 'react-native';
-import { BudgetContext } from '../context/BudgetContext';
 import { addMonths, format, startOfDay, endOfDay } from 'date-fns';
 import { RectButton } from 'react-native-gesture-handler';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -8,10 +7,24 @@ import { LineChart } from 'react-native-chart-kit';
 import { supabase } from '../utils/supabase';
 
 export default function HomeScreen() {
-  const { state } = useContext(BudgetContext);
-
   const [transactions, setTransactions] = useState([]);
   const [balanceOverrides, setBalanceOverrides] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*');
+
+      if (!error) {
+        setAccounts(data);
+      } else {
+        console.error('Error fetching accounts', error);
+      }
+    };
+
+    fetchAccounts();
+  }, []);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -80,7 +93,7 @@ export default function HomeScreen() {
                 />
               </RectButton>
               {expanded &&
-                (state.accounts || []).map((account) => {
+                (accounts || []).map((account) => {
                   const monthStart = startOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
                   const monthEnd = endOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
                   const allTx = [...transactions];

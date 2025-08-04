@@ -1,15 +1,13 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { BudgetContext } from '../context/BudgetContext';
 
 import { supabase } from '../utils/supabase';
 import { useSession } from '@supabase/auth-helpers-react';
 
 const SettingsScreen = () => {
-  const { state, dispatch } = useContext(BudgetContext);
   const session = useSession();
 
   const arrayToCSV = (arr, keys) => {
@@ -119,11 +117,6 @@ const SettingsScreen = () => {
             break;
           }
         }
-      }
-
-      for (const [key, value] of Object.entries(stateSlices)) {
-        dispatch({ type: `RESET_${key.toUpperCase()}` });
-        dispatch({ type: `SET_${key.toUpperCase()}`, payload: value });
       }
 
       Alert.alert('Restore', 'Data restored successfully!');

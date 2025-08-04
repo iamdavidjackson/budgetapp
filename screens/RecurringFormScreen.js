@@ -1,14 +1,12 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, TextInput, Button, StyleSheet, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DatePicker from 'react-native-date-picker';
-import { BudgetContext } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
 
 export default function RecurringFormScreen({ navigation, route }) {
-  const { state } = useContext(BudgetContext);
-  const accounts = state.accounts || [];
+  const [accounts, setAccounts] = useState([]);
 
   const recurringId = route?.params?.recurringId;
   const [existing, setExisting] = useState(null);
@@ -29,6 +27,19 @@ export default function RecurringFormScreen({ navigation, route }) {
   useFocusEffect(
     React.useCallback(() => {
       const fetchRecurring = async () => {
+        const fetchAccounts = async () => {
+          const { data, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .order('name');
+          if (error) {
+            console.error('Error fetching accounts:', error);
+          } else {
+            setAccounts(data);
+          }
+        };
+        await fetchAccounts();
+
         if (recurringId) {
           setLoading(true);
           const { data, error } = await supabase
@@ -58,6 +69,26 @@ export default function RecurringFormScreen({ navigation, route }) {
       fetchRecurring();
     }, [recurringId])
   );
+
+  useEffect(() => {
+    const loadAccounts = async () => {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .order('name');
+      if (error) {
+        console.error('Error fetching accounts:', error);
+      } else {
+        setAccounts(data);
+        if (!recurringId && data.length > 0) {
+          setAccountId(data[0].id);
+        }
+      }
+    };
+    if (!recurringId) {
+      loadAccounts();
+    }
+  }, [recurringId]);
 
   const onSave = async () => {
     if (type === 'transfer' && !transferToAccountId) {

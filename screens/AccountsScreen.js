@@ -1,13 +1,11 @@
-import React, { useContext, useLayoutEffect } from 'react';
+import React, { useLayoutEffect, useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
 import { supabase } from '../utils/supabase';
-import { ScrollView, View, Text, Button, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
-import { BudgetContext } from '../context/BudgetContext';
 
 export default function AccountsScreen({ navigation }) {
-  const { state, dispatch } = useContext(BudgetContext);
+  const [accounts, setAccounts] = useState([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -17,14 +15,12 @@ export default function AccountsScreen({ navigation }) {
           console.error('Error loading accounts:', error);
           return;
         }
-        dispatch({ type: 'SET_ACCOUNTS', payload: data });
+        setAccounts(data);
       };
 
       fetchAccounts();
-    }, [dispatch])
+    }, [])
   );
-
-  const accounts = state.accounts || [];
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -42,7 +38,7 @@ export default function AccountsScreen({ navigation }) {
       console.error('Error deleting account from Supabase:', error);
       return;
     }
-    dispatch({ type: 'DELETE_ACCOUNT', payload: id });
+    setAccounts(prev => prev.filter(account => account.id !== id));
   };
 
   const renderRightActions = (item) => (
@@ -117,4 +113,3 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   }
 });
-  

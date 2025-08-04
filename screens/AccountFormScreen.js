@@ -1,17 +1,37 @@
 import { supabase } from '../utils/supabase';
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { BudgetContext } from '../context/BudgetContext';
 
 export default function AccountFormScreen({ navigation, route }) {
-  const { state, dispatch } = useContext(BudgetContext);
   const accountId = route?.params?.accountId;
-  const account = state.accounts.find(acc => acc.id === accountId);
+  const [account, setAccount] = useState(null);
 
   const [name, setName] = useState(account?.name || '');
   const [type, setType] = useState(account?.type || 'bank');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (accountId) {
+      const fetchAccount = async () => {
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('*')
+          .eq('id', accountId)
+          .single();
+
+        if (error) {
+          Alert.alert('Error', error.message);
+        } else {
+          setAccount(data);
+          setName(data.name);
+          setType(data.type);
+        }
+      };
+
+      fetchAccount();
+    }
+  }, [accountId]);
 
   const onSubmit = async () => {
     if (!name.trim()) {
@@ -36,11 +56,6 @@ export default function AccountFormScreen({ navigation, route }) {
           .eq('id', accountId);
 
         if (error) throw error;
-
-        dispatch({
-          type: 'UPDATE_ACCOUNT',
-          payload: { id: accountId, ...updatedAccount }
-        });
       } else {
         const { data, error } = await supabase
           .from('accounts')
@@ -49,11 +64,6 @@ export default function AccountFormScreen({ navigation, route }) {
           .single();
 
         if (error) throw error;
-
-        dispatch({
-          type: 'ADD_ACCOUNT',
-          payload: data
-        });
       }
 
       navigation.goBack();

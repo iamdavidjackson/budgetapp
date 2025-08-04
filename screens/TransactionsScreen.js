@@ -1,38 +1,47 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { BudgetContext } from '../context/BudgetContext';
 import { format, parseISO, parse } from 'date-fns';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '../utils/supabase';
 
 export default function TransactionsScreen() {
-  const { state, dispatch } = useContext(BudgetContext);
+  const [transactions, setTransactions] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const navigation = useNavigation();
 
   useFocusEffect(
     useCallback(() => {
       const fetchTransactions = async () => {
-        const { data, error } = await supabase
+        const { data: transactionsData, error: transactionsError } = await supabase
           .from('transactions')
           .select('*')
           .order('forecasted_date', { ascending: true });
 
-        if (error) {
-          console.error('Error fetching transactions:', error);
+        const { data: accountsData, error: accountsError } = await supabase
+          .from('accounts')
+          .select('*');
+
+        if (transactionsError) {
+          console.error('Error fetching transactions:', transactionsError);
         } else {
-          dispatch({ type: 'SET_TRANSACTIONS', payload: data });
+          setTransactions(transactionsData);
+        }
+
+        if (accountsError) {
+          console.error('Error fetching accounts:', accountsError);
+        } else {
+          setAccounts(accountsData);
         }
       };
 
       fetchTransactions();
-    }, [dispatch])
+    }, [])
   );
 
-  const transactions = useMemo(() => {
-    const grouped = (state.transactions || []).reduce((acc, tx) => {
+  const groupedTransactions = useMemo(() => {
+    const grouped = (transactions || []).reduce((acc, tx) => {
       const month = format(parseISO(tx.forecasted_date), 'MMMM yyyy');
       if (!acc[month]) acc[month] = [];
       acc[month].push(tx);
@@ -56,7 +65,7 @@ export default function TransactionsScreen() {
       });
 
     return result;
-  }, [state.transactions]);
+  }, [transactions]);
 
   const renderRightActions = (item) => {
     if (!item.forecasted) return null;
@@ -64,11 +73,22 @@ export default function TransactionsScreen() {
     return (
       <RectButton
         style={[styles.swipeButton, { backgroundColor: '#f44336' }]}
-        onPress={() => {
-          dispatch({
-            type: 'DELETE_TRANSACTION',
-            payload: { id: item.id }
-          });
+        onPress={async () => {
+          try {
+            const { error } = await supabase
+              .from('transactions')
+              .delete()
+              .eq('id', item.id);
+
+            if (error) {
+              console.error('Error deleting transaction:', error);
+              return;
+            }
+
+            setTransactions(prev => prev.filter(tx => tx.id !== item.id));
+          } catch (err) {
+            console.error('Unexpected error deleting transaction:', err);
+          }
         }}
       >
         <Text style={styles.swipeText}>Delete</Text>
@@ -79,12 +99,12 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.container}>
       <View style={{ flex: 1 }}>
-        {transactions.length === 0 ? (
+        {groupedTransactions.length === 0 ? (
           <Text style={styles.empty}>No forecasted transactions.</Text>
         ) : (
           <FlatList
-            data={transactions}
-            keyExtractor={(item) => item.id}
+            data={groupedTransactions}
+            keyExtractor={(item) => item.id || item.month}
             renderItem={({ item }) => {
               if (item.type === 'divider') {
                 return <Text style={styles.divider}>{item.month}</Text>;
@@ -106,15 +126,50 @@ export default function TransactionsScreen() {
                         <View>
                           <Text style={styles.transactionName}>{item.description}</Text>
                           <Text style={styles.transactionDetails}>
-                            {(state.accounts.find(acc => acc.id === item.account_id) || {}).name || ''} • {item.forecasted_date} -{' '}
-                            {!item.forecasted && item.amount && parseFloat(item.amount) !== parseFloat(item.forecasted_amount) ? (
-                              <>
-                                <Text style={styles.strikethrough}>${item.forecasted_amount}</Text>{' '}
-                                <Text>${parseFloat(item.amount).toFixed(2)}</Text>
-                              </>
-                            ) : (
-                              `$${parseFloat(item.amount ?? item.forecasted_amount).toFixed(2)}`
-                            )}
+                            {(() => {
+                              const accountFrom = accounts.find(acc => acc.id === item.account_id)?.name || 'Unknown Account';
+                              const accountTo = accounts.find(acc => acc.id === item.secondary_account_id)?.name || 'Unknown Account';
+                              const amountDisplay = !item.forecasted && item.amount && parseFloat(item.amount) !== parseFloat(item.forecasted_amount) ? (
+                                <>
+                                  <Text style={styles.strikethrough}>${item.forecasted_amount}</Text>{' '}
+                                  <Text>${parseFloat(item.amount).toFixed(2)}</Text>
+                                </>
+                              ) : (
+                                <Text>${parseFloat(item.amount ?? item.forecasted_amount).toFixed(2)}</Text>
+                              );
+                              const datePrefix = `${format(new Date(item.date || item.forecasted_date), 'EEEE, do')} | `;
+
+                              switch (item.type) {
+                                case 'income':
+                                  return (
+                                    <>
+                                      <Text>{datePrefix}Income to {accountFrom}: </Text>
+                                      {amountDisplay}
+                                    </>
+                                  );
+                                case 'expense':
+                                  return (
+                                    <>
+                                      <Text>{datePrefix}Expense from {accountFrom}: </Text>
+                                      {amountDisplay}
+                                    </>
+                                  );
+                                case 'transfer':
+                                  return (
+                                    <>
+                                      <Text>{datePrefix}Transfer from {accountFrom} to {accountTo}: </Text>
+                                      {amountDisplay}
+                                    </>
+                                  );
+                                default:
+                                  return (
+                                    <>
+                                      <Text>{datePrefix}{accountFrom}: </Text>
+                                      {amountDisplay}
+                                    </>
+                                  );
+                              }
+                            })()}
                           </Text>
                         </View>
                         {!item.forecasted && (
