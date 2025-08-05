@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TextInput, Button, StyleSheet, Platform } from 'react-native';
+import { ScrollView, View, Text, TextInput, Button, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../utils/supabase';
+import DatePicker from 'react-native-date-picker';
 
 export default function AddTransactionScreen({ navigation }) {
   const [accounts, setAccounts] = useState([]);
@@ -14,9 +14,11 @@ export default function AddTransactionScreen({ navigation }) {
   const [date, setDate] = useState(new Date());
   const [accountId, setAccountId] = useState('');
   const [transferToAccountId, setTransferToAccountId] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAccounts = async () => {
+      setLoading(true);
       const { data, error } = await supabase.from('accounts').select('*');
       if (error) {
         console.error('Error fetching accounts:', error);
@@ -26,33 +28,57 @@ export default function AddTransactionScreen({ navigation }) {
           setAccountId(data[0].id);
         }
       }
+      setLoading(false);
     };
     fetchAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const onSubmit = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!amount || !description || !category || !accountId) {
+      alert('Please fill in all required fields.');
+      return;
+    }
 
-  const onSubmit = () => {
-    const transaction = {
-      id: Date.now().toString(),
-      type,
-      amount: parseFloat(amount),
-      category,
-      description,
-      date: date.toISOString().split('T')[0],
-      accountId,
-      transferToAccountId: type === 'transfer' ? transferToAccountId : undefined,
-    };
-    console.log('New Transaction:', transaction);
-    // TODO: dispatch to context and save
-    navigation.goBack();
+    const { error } = await supabase.from('transactions').insert([
+      {
+        type,
+        amount: parseFloat(amount),
+        forecasted_amount: parseFloat(amount),
+        category,
+        description,
+        date: date.toISOString().split('T')[0],
+        forecasted_date: date.toISOString().split('T')[0],
+        forecasted: false,
+        account_id: accountId,
+        secondary_account_id: type === 'transfer' ? transferToAccountId : null,
+        recurring_id: null,
+        user_id: user.id,
+      }
+    ]);
+
+    if (error) {
+      console.error('Error saving transaction:', error);
+      alert('Failed to save transaction.');
+    } else {
+      navigation.goBack();
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.label}>Type</Text>
       <Picker selectedValue={type} onValueChange={setType}>
+        <Picker.Item label="Select a type" value="" />
         <Picker.Item label="Income" value="income" />
         <Picker.Item label="Expense" value="expense" />
         <Picker.Item label="Transfer" value="transfer" />
@@ -62,13 +88,20 @@ export default function AddTransactionScreen({ navigation }) {
       <TextInput style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} />
 
       <Text style={styles.label}>Category</Text>
-      <TextInput style={styles.input} value={category} onChangeText={setCategory} />
+      <Picker selectedValue={category} onValueChange={setCategory}>
+        <Picker.Item label="Select a category" value="" />
+        <Picker.Item label="Essential – Fixed (e.g. rent, salary)" value="essential_fixed" />
+        <Picker.Item label="Essential – Variable (e.g. groceries, utilities)" value="essential_variable" />
+        <Picker.Item label="Flexible – Regular but Optional (e.g. subscriptions)" value="flexible" />
+        <Picker.Item label="Discretionary – Optional (e.g. entertainment)" value="discretionary" />
+      </Picker>
 
       <Text style={styles.label}>Description</Text>
       <TextInput style={styles.input} value={description} onChangeText={setDescription} />
 
       <Text style={styles.label}>From Account</Text>
       <Picker selectedValue={accountId} onValueChange={setAccountId}>
+        <Picker.Item label="Select an account" value="" />
         {accounts.map(acc => (
           <Picker.Item key={acc.id} label={acc.name} value={acc.id} />
         ))}
@@ -78,7 +111,8 @@ export default function AddTransactionScreen({ navigation }) {
         <>
           <Text style={styles.label}>To Account</Text>
           <Picker selectedValue={transferToAccountId} onValueChange={setTransferToAccountId}>
-            {accounts
+            <Picker.Item label="Select an account" value="" />
+              {accounts
               .filter(acc => acc.id !== accountId)
               .map(acc => (
                 <Picker.Item key={acc.id} label={acc.name} value={acc.id} />
@@ -88,18 +122,25 @@ export default function AddTransactionScreen({ navigation }) {
       )}
 
       <Text style={styles.label}>Date</Text>
-      <Button title={date.toDateString()} onPress={() => setShowDatePicker(true)} />
-      {showDatePicker && (
-        <DateTimePicker
-          value={date}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) setDate(selectedDate);
-          }}
-        />
-      )}
+      {Platform.select({
+        web: (
+          <input
+            type="date"
+            className="web-date-input"
+            value={date.toISOString().split('T')[0]}
+            onChange={(e) => setDate(new Date(e.target.value))}
+            style={styles.input}
+          />
+        ),
+        default: (
+          <DatePicker
+            date={date}
+            mode="date"
+            onDateChange={setDate}
+            androidVariant="nativeAndroid"
+          />
+        )
+      })}
 
       <View style={styles.submit}>
         <Button title="Save Transaction" onPress={onSubmit} />
@@ -118,5 +159,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderRadius: 4
   },
-  submit: { marginTop: 24 }
+  submit: { marginTop: 24 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

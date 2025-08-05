@@ -291,6 +291,7 @@ export default function RecurringFormScreen({ navigation, route }) {
 
       <Text style={styles.label}>Category</Text>
       <Picker selectedValue={category} onValueChange={setCategory}>
+        <Picker.Item label="Select a category" value="" />
         <Picker.Item label="Essential – Fixed (e.g. rent, salary)" value="essential_fixed" />
         <Picker.Item label="Essential – Variable (e.g. groceries, utilities)" value="essential_variable" />
         <Picker.Item label="Flexible – Regular but Optional (e.g. subscriptions)" value="flexible" />
@@ -299,6 +300,7 @@ export default function RecurringFormScreen({ navigation, route }) {
 
       <Text style={styles.label}>Type</Text>
       <Picker selectedValue={type} onValueChange={setType}>
+        <Picker.Item label="Select a type" value="" />
         <Picker.Item label="Income" value="income" />
         <Picker.Item label="Expense" value="expense" />
         <Picker.Item label="Transfer" value="transfer" />
@@ -306,6 +308,7 @@ export default function RecurringFormScreen({ navigation, route }) {
 
       <Text style={styles.label}>Frequency</Text>
       <Picker selectedValue={frequency} onValueChange={setFrequency}>
+        <Picker.Item label="Select a frequency" value="" />
         <Picker.Item label="Daily" value="daily" />
         <Picker.Item label="Weekly" value="weekly" />
         <Picker.Item label="Bi-Weekly" value="biweekly" />

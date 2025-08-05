@@ -122,6 +122,28 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
       )}
 
       <Button title="Confirm Transaction" onPress={handleConfirm} />
+
+      <View style={{ marginTop: 24 }}>
+        <Button
+          title="Delete Transaction"
+          color="red"
+          onPress={async () => {
+            if (!transactionData) return;
+            setLoading(true);
+            const { error } = await supabase
+              .from('transactions')
+              .delete()
+              .eq('id', transactionData.id);
+
+            setLoading(false);
+            if (!error) {
+              navigation.goBack();
+            } else {
+              console.error('Error deleting transaction:', error);
+            }
+          }}
+        />
+      </View>
     </View>
   );
 }
