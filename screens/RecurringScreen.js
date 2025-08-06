@@ -1,7 +1,8 @@
 import React, { useLayoutEffect, useEffect, useState } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
+import { MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '../utils/supabase';
 
 export default function RecurringScreen() {
@@ -12,9 +13,20 @@ export default function RecurringScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable onPress={() => navigation.navigate('Add Recurring Item')}>
-          <Text style={{ fontSize: 28 }}>＋</Text>
-        </Pressable>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Add Recurring Item')}
+          style={{
+            marginRight: 20,
+            backgroundColor: '#4CAF50',
+            borderRadius: 20,
+            width: 30,
+            height: 30,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <MaterialIcons name="add" size={20} color="#fff" />
+        </TouchableOpacity>
       ),
     });
   }, [navigation]);
@@ -118,7 +130,7 @@ export default function RecurringScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, paddingBottom: 64, paddingTop: 16 },
+  container: { padding: 16, flex: 1, paddingBottom: 16, paddingTop: 16 },
   empty: { marginBottom: 20, color: 'gray' },
   item: {
     backgroundColor: '#fff',

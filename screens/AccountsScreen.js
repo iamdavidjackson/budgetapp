@@ -1,16 +1,20 @@
 import React, { useLayoutEffect, useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../utils/supabase';
-import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function AccountsScreen({ navigation }) {
   const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       const fetchAccounts = async () => {
+        setLoading(true);
         const { data, error } = await supabase.from('accounts').select('*').order('created_at');
+        setLoading(false);
         if (error) {
           console.error('Error loading accounts:', error);
           return;
@@ -25,9 +29,20 @@ export default function AccountsScreen({ navigation }) {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable onPress={() => navigation.navigate('Add Account')}>
-          <Text style={{ fontSize: 28, marginRight: 16 }}>＋</Text>
-        </Pressable>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Add Account')}
+          style={{
+            marginRight: 20,
+            backgroundColor: '#4CAF50',
+            borderRadius: 20,
+            width: 30,
+            height: 30,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <MaterialIcons name="add" size={20} color="#fff" />
+        </TouchableOpacity>
       ),
     });
   }, [navigation]);
@@ -65,7 +80,9 @@ export default function AccountsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {accounts.length === 0 ? (
+      {loading ? (
+        <ActivityIndicator size="large" color="#0000ff" />
+      ) : accounts.length === 0 ? (
         <Text style={styles.empty}>No accounts yet. Add one below!</Text>
       ) : (
         <FlatList
@@ -80,7 +97,7 @@ export default function AccountsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, paddingBottom: 64, paddingTop: 16 },
+  container: { padding: 16, flex: 1, paddingBottom: 16, paddingTop: 16 },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   empty: { marginBottom: 20, color: 'gray' },
   accountCard: {

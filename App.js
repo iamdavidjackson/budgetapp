@@ -67,6 +67,10 @@ export default function App() {
                 }
 
                 return <MaterialIcons name={iconName} size={size} color={color} />;
+              },
+              tabBarStyle: {
+                paddingBottom: 20,
+                height: 80,
               }
             })}
           >

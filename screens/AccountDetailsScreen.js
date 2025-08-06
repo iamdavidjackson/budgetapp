@@ -116,11 +116,14 @@ const AccountDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16
+    padding: 16,
+    paddingBottom: 0,
+    paddingTop: 0
   },
   header: {
     fontSize: 24,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+    marginTop: 16,
   },
   subheader: {
     fontSize: 16,

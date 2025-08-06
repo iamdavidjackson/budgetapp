@@ -27,7 +27,7 @@ const SettingsScreen = () => {
 export default SettingsScreen;
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, paddingBottom: 64, paddingTop: 16 },
+  container: { padding: 16, flex: 1, paddingBottom: 0, paddingTop: 0 },
   button: {
     backgroundColor: '#007AFF',
     padding: 12,

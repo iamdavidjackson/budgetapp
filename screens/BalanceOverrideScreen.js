@@ -108,7 +108,9 @@ const BalanceOverrideScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16
+    padding: 16,
+    paddingBottom: 0,
+    paddingTop: 0
   },
   label: {
     fontSize: 16,

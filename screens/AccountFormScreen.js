@@ -102,7 +102,7 @@ export default function AccountFormScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
+  container: { padding: 16, paddingBottom: 0, paddingTop: 0 },
   label: { marginTop: 16, fontWeight: 'bold' },
   input: {
     borderWidth: 1,

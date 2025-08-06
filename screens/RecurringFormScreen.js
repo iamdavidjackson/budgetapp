@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { screenStyles } from '../styles/screens';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TextInput, ScrollView, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DatePicker from 'react-native-date-picker';
 import { supabase } from '../utils/supabase';
@@ -275,22 +276,22 @@ export default function RecurringFormScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <View style={styles.loaderContainer}>
+      <View style={screenStyles.loaderContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.label}>Name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} />
+    <ScrollView contentContainerStyle={screenStyles.container}>
+      <Text style={screenStyles.label}>Name</Text>
+      <TextInput style={screenStyles.input} value={name} onChangeText={setName} />
 
-      <Text style={styles.label}>Amount</Text>
-      <TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="numeric" />
+      <Text style={screenStyles.label}>Amount</Text>
+      <TextInput style={screenStyles.input} value={amount} onChangeText={setAmount} keyboardType="numeric" />
 
-      <Text style={styles.label}>Category</Text>
-      <Picker selectedValue={category} onValueChange={setCategory}>
+      <Text style={screenStyles.label}>Category</Text>
+      <Picker selectedValue={category} onValueChange={setCategory} style={screenStyles.picker}>
         <Picker.Item label="Select a category" value="" />
         <Picker.Item label="Essential – Fixed (e.g. rent, salary)" value="essential_fixed" />
         <Picker.Item label="Essential – Variable (e.g. groceries, utilities)" value="essential_variable" />
@@ -298,16 +299,16 @@ export default function RecurringFormScreen({ navigation, route }) {
         <Picker.Item label="Discretionary – Optional (e.g. entertainment)" value="discretionary" />
       </Picker>
 
-      <Text style={styles.label}>Type</Text>
-      <Picker selectedValue={type} onValueChange={setType}>
+      <Text style={screenStyles.label}>Type</Text>
+      <Picker selectedValue={type} onValueChange={setType} style={screenStyles.picker}>
         <Picker.Item label="Select a type" value="" />
         <Picker.Item label="Income" value="income" />
         <Picker.Item label="Expense" value="expense" />
         <Picker.Item label="Transfer" value="transfer" />
       </Picker>
 
-      <Text style={styles.label}>Frequency</Text>
-      <Picker selectedValue={frequency} onValueChange={setFrequency}>
+      <Text style={screenStyles.label}>Frequency</Text>
+      <Picker selectedValue={frequency} onValueChange={setFrequency} style={screenStyles.picker}>
         <Picker.Item label="Select a frequency" value="" />
         <Picker.Item label="Daily" value="daily" />
         <Picker.Item label="Weekly" value="weekly" />
@@ -316,7 +317,7 @@ export default function RecurringFormScreen({ navigation, route }) {
         <Picker.Item label="Yearly" value="yearly" />
       </Picker>
 
-      <Text style={styles.label}>Start Date</Text>
+      <Text style={screenStyles.label}>Start Date</Text>
       {Platform.select({
         web: (
           <input
@@ -324,7 +325,7 @@ export default function RecurringFormScreen({ navigation, route }) {
             className="web-date-input"
             value={startDate.toISOString().split('T')[0]}
             onChange={(e) => setStartDate(new Date(e.target.value))}
-            style={styles.input}
+            style={screenStyles.input}
           />
         ),
         default: (
@@ -337,7 +338,7 @@ export default function RecurringFormScreen({ navigation, route }) {
         )
       })}
 
-      <Text style={styles.label}>End Date</Text>
+      <Text style={screenStyles.label}>End Date</Text>
       {Platform.select({
         web: (
           <input
@@ -345,7 +346,7 @@ export default function RecurringFormScreen({ navigation, route }) {
             className="web-date-input"
             value={endDate ? endDate.toISOString().split('T')[0] : ''}
             onChange={(e) => setEndDate(new Date(e.target.value))}
-            style={styles.input}
+            style={screenStyles.input}
           />
         ),
         default: (
@@ -358,8 +359,8 @@ export default function RecurringFormScreen({ navigation, route }) {
         )
       })}
 
-      <Text style={styles.label}>From Account</Text>
-      <Picker selectedValue={accountId} onValueChange={setAccountId}>
+      <Text style={screenStyles.label}>From Account</Text>
+      <Picker selectedValue={accountId} onValueChange={setAccountId} style={screenStyles.picker}>
         {accounts.map(acc => (
           <Picker.Item key={acc.id} label={acc.name} value={acc.id} />
         ))}
@@ -367,8 +368,8 @@ export default function RecurringFormScreen({ navigation, route }) {
 
       {type === 'transfer' && (
         <>
-          <Text style={styles.label}>To Account</Text>
-          <Picker selectedValue={transferToAccountId} onValueChange={setTransferToAccountId}>
+          <Text style={screenStyles.label}>To Account</Text>
+          <Picker selectedValue={transferToAccountId} onValueChange={setTransferToAccountId} style={screenStyles.picker}>
             <Picker.Item label="Select an account" value="" />
             {accounts.filter(acc => acc.id !== accountId).map(acc => (
               <Picker.Item key={acc.id} label={acc.name} value={acc.id} />
@@ -377,42 +378,26 @@ export default function RecurringFormScreen({ navigation, route }) {
         </>
       )}
 
-      <Text style={styles.label}>Weekend Policy</Text>
-      <Picker selectedValue={weekendPolicy} onValueChange={setWeekendPolicy}>
+      <Text style={screenStyles.label}>Weekend Policy</Text>
+      <Picker selectedValue={weekendPolicy} onValueChange={setWeekendPolicy} style={screenStyles.picker}>
         <Picker.Item label="Post on Date" value="post_on_date" />
         <Picker.Item label="Next Weekday" value="next_weekday" />
       </Picker>
 
-      <Text style={styles.label}>Notes</Text>
+      <Text style={screenStyles.label}>Notes</Text>
       <TextInput
-        style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+        style={[screenStyles.input, { height: 100, textAlignVertical: 'top' }]}
         value={notes}
         onChangeText={setNotes}
         multiline
         numberOfLines={4}
       />
 
-      <View style={styles.buttons}>
-        <Button title="Save" onPress={onSave} />
+      <View style={screenStyles.buttons}>
+        <TouchableOpacity onPress={onSave} style={screenStyles.primaryButton}>
+          <Text style={screenStyles.primaryButtonText}>Save</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 64, paddingTop: 16 },
-  label: { marginTop: 16, fontWeight: 'bold' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 8,
-    marginTop: 4,
-    borderRadius: 4
-  },
-  buttons: { marginTop: 24 },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  }
-});

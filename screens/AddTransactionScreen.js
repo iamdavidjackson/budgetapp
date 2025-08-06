@@ -150,7 +150,7 @@ export default function AddTransactionScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 64 },
+  container: { padding: 16, flex: 1, paddingBottom: 0, paddingTop: 0 },
   label: { marginTop: 16, fontWeight: 'bold' },
   input: {
     borderWidth: 1,

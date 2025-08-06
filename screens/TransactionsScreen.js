@@ -15,8 +15,19 @@ export default function TransactionsScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={() => navigation.navigate('Add Transaction')} style={{ marginRight: 16 }}>
-          <MaterialIcons name="add" size={24} color="black" />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Add Transaction')}
+          style={{
+            marginRight: 20,
+            backgroundColor: '#4CAF50',
+            borderRadius: 20,
+            width: 30,
+            height: 30,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <MaterialIcons name="add" size={20} color="#fff" />
         </TouchableOpacity>
       ),
     });
@@ -214,7 +225,7 @@ export default function TransactionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, paddingBottom: 64, paddingTop: 16 },
+  container: { padding: 16, flex: 1, paddingBottom: 0, paddingTop: 0 },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   empty: { marginBottom: 20, color: 'gray' },
   accountCard: {

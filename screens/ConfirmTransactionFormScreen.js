@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, Platform, Switch } from 'react-native';
+import { View, Text, TextInput, Button, TouchableOpacity, ActivityIndicator, Platform, Switch } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { format } from 'date-fns';
 import { supabase } from '../utils/supabase';
+import { screenStyles } from '../styles/screens';
 
 export default function ConfirmTransactionFormScreen({ route, navigation }) {
   const { forecastedTransaction } = route.params;
@@ -59,35 +60,47 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={screenStyles.container}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Name</Text>
-      <Text style={styles.value}>{transactionData?.description}</Text>
+    <View style={screenStyles.container}>
+      <Text style={screenStyles.label}>Name</Text>
+      <TextInput
+        style={[screenStyles.input, { backgroundColor: '#eee' }]}
+        value={transactionData?.description || ''}
+        editable={false}
+      />
 
-      <Text style={styles.label}>Date</Text>
-      <Text style={styles.value}>{transactionData?.forecasted_date}</Text>
+      <Text style={screenStyles.label}>Date</Text>
+      <TextInput
+        style={[screenStyles.input, { backgroundColor: '#eee' }]}
+        value={transactionData?.forecasted_date || ''}
+        editable={false}
+      />
 
-      <Text style={styles.label}>Forecasted Amount</Text>
-      <Text style={styles.value}>${parseFloat(transactionData?.forecasted_amount || 0).toFixed(2)}</Text>
+      <Text style={screenStyles.label}>Forecasted Amount</Text>
+      <TextInput
+        style={[screenStyles.input, { backgroundColor: '#eee' }]}
+        value={`$${parseFloat(transactionData?.forecasted_amount || 0).toFixed(2)}`}
+        editable={false}
+      />
 
-      <Text style={styles.label}>Confirmed</Text>
+      <Text style={screenStyles.label}>Confirmed</Text>
       <Switch value={confirmed} onValueChange={setConfirmed} />
 
-      <Text style={styles.label}>Actual Amount</Text>
+      <Text style={screenStyles.label}>Actual Amount</Text>
       <TextInput
-        style={styles.input}
+        style={screenStyles.input}
         value={actualAmount}
         onChangeText={setActualAmount}
         keyboardType="decimal-pad"
       />
 
-      <Text style={styles.label}>Actual Date</Text>
+      <Text style={screenStyles.label}>Actual Date</Text>
       {Platform.OS === 'web' ? (
         <input
           type="date"
@@ -121,12 +134,13 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
         </>
       )}
 
-      <Button title="Confirm Transaction" onPress={handleConfirm} />
+      
+      <View style={screenStyles.buttons}>
+        <TouchableOpacity onPress={handleConfirm} style={screenStyles.primaryButton}>
+          <Text style={screenStyles.primaryButtonText}>Confirm Transaction</Text>
+        </TouchableOpacity>
 
-      <View style={{ marginTop: 24 }}>
-        <Button
-          title="Delete Transaction"
-          color="red"
+        <TouchableOpacity
           onPress={async () => {
             if (!transactionData) return;
             setLoading(true);
@@ -142,34 +156,11 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
               console.error('Error deleting transaction:', error);
             }
           }}
-        />
+          style={screenStyles.secondaryButton}
+        >
+          <Text style={screenStyles.secondaryButtonText}>Delete Transaction</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    flex: 1
-  },
-  label: {
-    marginTop: 16,
-    fontWeight: 'bold'
-  },
-  value: {
-    fontSize: 16,
-    marginTop: 4
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 8,
-    marginTop: 8,
-    borderRadius: 4
-  },
-  error: {
-    color: 'red',
-    fontSize: 16
-  }
-});
