@@ -1,5 +1,6 @@
+import { screenStyles } from '../styles/screens';
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Platform, ActivityIndicator, TouchableOpacity } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { format } from 'date-fns';
@@ -12,7 +13,7 @@ const BalanceOverrideScreen = () => {
   const { accountId } = route.params;
 
   const [date, setDate] = useState(new Date());
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
@@ -44,7 +45,6 @@ const BalanceOverrideScreen = () => {
     ]);
 
     if (error) {
-      console.error('Error saving balance to Supabase:', error);
       setLoading(false);
       return;
     }
@@ -55,28 +55,29 @@ const BalanceOverrideScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={screenStyles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Date</Text>
+    <View style={screenStyles.container}>
+      <Text style={screenStyles.label}>Amount</Text>
+      <TextInput
+        style={screenStyles.input}
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="numeric"
+      />
+      
+      <Text style={screenStyles.label}>Date</Text>
       {Platform.OS === 'web' ? (
         <input
           type="date"
           value={format(date, 'yyyy-MM-dd')}
           onChange={(e) => setDate(new Date(e.target.value))}
-          style={{
-            padding: 8,
-            borderRadius: 4,
-            borderWidth: 1,
-            borderColor: '#ccc',
-            marginTop: 8,
-            fontSize: 16,
-          }}
+          style={screenStyles.input}
         />
       ) : (
         <>
@@ -91,43 +92,13 @@ const BalanceOverrideScreen = () => {
         </>
       )}
 
-      <Text style={styles.label}>Amount</Text>
-      <TextInput
-        style={styles.input}
-        value={amount}
-        onChangeText={setAmount}
-        keyboardType="numeric"
-        placeholder="Enter balance"
-      />
-
-      <Button title="Save Override" onPress={handleSave} />
+      <View style={screenStyles.buttons}>
+        <TouchableOpacity onPress={handleSave} style={screenStyles.primaryButton}>
+          <Text style={screenStyles.primaryButtonText}>Save Balance</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    paddingBottom: 0,
-    paddingTop: 0
-  },
-  label: {
-    fontSize: 16,
-    marginTop: 16
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 8,
-    borderRadius: 4,
-    marginTop: 8
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  }
-});
 
 export default BalanceOverrideScreen;

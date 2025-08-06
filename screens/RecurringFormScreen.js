@@ -283,7 +283,7 @@ export default function RecurringFormScreen({ navigation, route }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={screenStyles.container}>
+    <ScrollView style={screenStyles.container}>
       <Text style={screenStyles.label}>Name</Text>
       <TextInput style={screenStyles.input} value={name} onChangeText={setName} />
 
@@ -386,7 +386,7 @@ export default function RecurringFormScreen({ navigation, route }) {
 
       <Text style={screenStyles.label}>Notes</Text>
       <TextInput
-        style={[screenStyles.input, { height: 100, textAlignVertical: 'top' }]}
+        style={[screenStyles.input, { minHeight: 100, textAlignVertical: 'top' }]}
         value={notes}
         onChangeText={setNotes}
         multiline

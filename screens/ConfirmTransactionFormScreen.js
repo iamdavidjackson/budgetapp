@@ -109,14 +109,7 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
             const [year, month, day] = e.target.value.split('-').map(Number);
             setDate(new Date(year, month - 1, day));
           }}
-          style={{
-            padding: 8,
-            borderRadius: 4,
-            borderWidth: 1,
-            borderColor: '#ccc',
-            marginTop: 8,
-            fontSize: 16,
-          }}
+          style={screenStyles.input}
         />
       ) : (
         <>

@@ -86,9 +86,9 @@ const AccountDetailsScreen = () => {
         </>
       )}
       <View style={styles.headerRow}>
-        <Text style={styles.sectionHeader}>Balance Overrides</Text>
+        <Text style={styles.sectionHeader}>Balances</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate('Balance Override', { accountId, accountName: account?.name })}
+          onPress={() => navigation.navigate('Add Balance', { accountId, accountName: account?.name })}
         >
           <MaterialIcons name="add" size={24} color="black" />
         </TouchableOpacity>

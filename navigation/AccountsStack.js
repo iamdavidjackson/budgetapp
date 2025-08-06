@@ -14,7 +14,7 @@ export default function AccountsStack() {
       <Stack.Screen name="Accounts" component={AccountsScreen} />
       <Stack.Screen name="Account Details" component={AccountDetailsScreen} />
       <Stack.Screen name="Add Account" component={AccountFormScreen} />
-      <Stack.Screen name="Balance Override" component={BalanceOverrideScreen} />
+      <Stack.Screen name="Add Balance" component={BalanceOverrideScreen} />
     </Stack.Navigator>
   );
 }

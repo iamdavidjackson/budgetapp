@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TextInput, Button, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TextInput, Button, Platform, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../utils/supabase';
 import DatePicker from 'react-native-date-picker';
+import {screenStyles} from '../styles/screens';
 
 export default function AddTransactionScreen({ navigation }) {
   const [accounts, setAccounts] = useState([]);
@@ -68,27 +69,27 @@ export default function AddTransactionScreen({ navigation }) {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={screenStyles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.label}>Type</Text>
-      <Picker selectedValue={type} onValueChange={setType}>
+    <ScrollView contentContainerStyle={screenStyles.container}>
+      <Text style={screenStyles.label}>Type</Text>
+      <Picker selectedValue={type} onValueChange={setType} style={screenStyles.picker}>
         <Picker.Item label="Select a type" value="" />
         <Picker.Item label="Income" value="income" />
         <Picker.Item label="Expense" value="expense" />
         <Picker.Item label="Transfer" value="transfer" />
       </Picker>
 
-      <Text style={styles.label}>Amount</Text>
-      <TextInput style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} />
+      <Text style={screenStyles.label}>Amount</Text>
+      <TextInput style={screenStyles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} />
 
-      <Text style={styles.label}>Category</Text>
-      <Picker selectedValue={category} onValueChange={setCategory}>
+      <Text style={screenStyles.label}>Category</Text>
+      <Picker selectedValue={category} onValueChange={setCategory} style={screenStyles.picker}>
         <Picker.Item label="Select a category" value="" />
         <Picker.Item label="Essential – Fixed (e.g. rent, salary)" value="essential_fixed" />
         <Picker.Item label="Essential – Variable (e.g. groceries, utilities)" value="essential_variable" />
@@ -96,11 +97,11 @@ export default function AddTransactionScreen({ navigation }) {
         <Picker.Item label="Discretionary – Optional (e.g. entertainment)" value="discretionary" />
       </Picker>
 
-      <Text style={styles.label}>Description</Text>
-      <TextInput style={styles.input} value={description} onChangeText={setDescription} />
+      <Text style={screenStyles.label}>Description</Text>
+      <TextInput style={screenStyles.input} value={description} onChangeText={setDescription} />
 
-      <Text style={styles.label}>From Account</Text>
-      <Picker selectedValue={accountId} onValueChange={setAccountId}>
+      <Text style={screenStyles.label}>From Account</Text>
+      <Picker selectedValue={accountId} onValueChange={setAccountId} style={screenStyles.picker}>
         <Picker.Item label="Select an account" value="" />
         {accounts.map(acc => (
           <Picker.Item key={acc.id} label={acc.name} value={acc.id} />
@@ -109,8 +110,8 @@ export default function AddTransactionScreen({ navigation }) {
 
       {type === 'transfer' && (
         <>
-          <Text style={styles.label}>To Account</Text>
-          <Picker selectedValue={transferToAccountId} onValueChange={setTransferToAccountId}>
+          <Text style={screenStyles.label}>To Account</Text>
+          <Picker selectedValue={transferToAccountId} onValueChange={setTransferToAccountId} style={screenStyles.picker}>
             <Picker.Item label="Select an account" value="" />
               {accounts
               .filter(acc => acc.id !== accountId)
@@ -121,7 +122,7 @@ export default function AddTransactionScreen({ navigation }) {
         </>
       )}
 
-      <Text style={styles.label}>Date</Text>
+      <Text style={screenStyles.label}>Date</Text>
       {Platform.select({
         web: (
           <input
@@ -129,7 +130,7 @@ export default function AddTransactionScreen({ navigation }) {
             className="web-date-input"
             value={date.toISOString().split('T')[0]}
             onChange={(e) => setDate(new Date(e.target.value))}
-            style={styles.input}
+            style={screenStyles.input}
           />
         ),
         default: (
@@ -142,27 +143,11 @@ export default function AddTransactionScreen({ navigation }) {
         )
       })}
 
-      <View style={styles.submit}>
-        <Button title="Save Transaction" onPress={onSubmit} />
+      <View style={screenStyles.buttons}>
+        <TouchableOpacity onPress={onSubmit} style={screenStyles.primaryButton}>
+          <Text style={screenStyles.primaryButtonText}>Save Transaction</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, paddingBottom: 0, paddingTop: 0 },
-  label: { marginTop: 16, fontWeight: 'bold' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 8,
-    marginTop: 4,
-    borderRadius: 4
-  },
-  submit: { marginTop: 24 },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
