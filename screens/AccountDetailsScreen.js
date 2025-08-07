@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '../utils/supabase';
 
@@ -13,38 +14,53 @@ const AccountDetailsScreen = () => {
   const navigation = useNavigation();
   const { accountId } = route.params;
 
-  React.useEffect(() => {
-    const fetchAccountData = async () => {
-      setLoading(true);
-      const { data: acc, error: accountError } = await supabase
-        .from('accounts')
-        .select('*')
-        .eq('id', accountId)
-        .single();
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          style={{ marginRight: 16 }}
+          onPress={() => navigation.navigate('Add Account', { accountId, accountName: account?.name })}
+        >
+          <MaterialIcons name="settings" size={24} color="black" />
+        </TouchableOpacity>
+      )
+    });
+  }, [navigation, accountId, account]);
 
-      const { data: balanceData, error: balanceError } = await supabase
-        .from('balances')
-        .select('*')
-        .eq('account_id', accountId)
-        .order('date', { ascending: true });
+  useFocusEffect(
+    useCallback(() => {
+      const fetchAccountData = async () => {
+        setLoading(true);
+        const { data: acc, error: accountError } = await supabase
+          .from('accounts')
+          .select('*')
+          .eq('id', accountId)
+          .single();
 
-      if (accountError) {
-        console.error('Error fetching account:', accountError.message);
-      } else {
-        setAccount(acc);
-      }
+        const { data: balanceData, error: balanceError } = await supabase
+          .from('balances')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('date', { ascending: true });
 
-      if (balanceError) {
-        console.error('Error fetching balances:', balanceError.message);
-      } else {
-        setOverrides(balanceData);
-      }
+        if (accountError) {
+          console.error('Error fetching account:', accountError.message);
+        } else {
+          setAccount(acc);
+        }
 
-      setLoading(false);
-    };
+        if (balanceError) {
+          console.error('Error fetching balances:', balanceError.message);
+        } else {
+          setOverrides(balanceData);
+        }
 
-    fetchAccountData();
-  }, [accountId]);
+        setLoading(false);
+      };
+
+      fetchAccountData();
+    }, [accountId])
+  );
 
   const handleDelete = async (date) => {
     setLoading(true);
@@ -83,6 +99,7 @@ const AccountDetailsScreen = () => {
         <>
           <Text style={styles.header}>{account.name}</Text>
           <Text style={styles.subheader}>{account.type}</Text>
+          <Text style={styles.subheader}>Interest Rate: {account.interest_rate ?? 0}%</Text>
         </>
       )}
       <View style={styles.headerRow}>

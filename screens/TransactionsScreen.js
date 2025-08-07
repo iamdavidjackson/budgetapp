@@ -159,7 +159,10 @@ export default function TransactionsScreen() {
                   >
                     <View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.transactionDate}>
+                            {format(new Date(item.date || item.forecasted_date), 'EEEE, do')}
+                          </Text>
                           <Text style={styles.transactionName}>{item.description}</Text>
                           <Text style={styles.transactionDetails}>
                             {(() => {
@@ -173,34 +176,33 @@ export default function TransactionsScreen() {
                               ) : (
                                 <Text>${parseFloat(item.amount ?? item.forecasted_amount).toFixed(2)}</Text>
                               );
-                              const datePrefix = `${format(new Date(item.date || item.forecasted_date), 'EEEE, do')} | `;
 
                               switch (item.type) {
                                 case 'income':
                                   return (
                                     <>
-                                      <Text>{datePrefix}Income to {accountFrom}: </Text>
+                                      <Text>Income to {accountFrom}: </Text>
                                       {amountDisplay}
                                     </>
                                   );
                                 case 'expense':
                                   return (
                                     <>
-                                      <Text>{datePrefix}Expense from {accountFrom}: </Text>
+                                      <Text>Expense from {accountFrom}: </Text>
                                       {amountDisplay}
                                     </>
                                   );
                                 case 'transfer':
                                   return (
                                     <>
-                                      <Text>{datePrefix}Transfer from {accountFrom} to {accountTo}: </Text>
+                                      <Text>Transfer from {accountFrom} to {accountTo}: </Text>
                                       {amountDisplay}
                                     </>
                                   );
                                 default:
                                   return (
                                     <>
-                                      <Text>{datePrefix}{accountFrom}: </Text>
+                                      <Text>{accountFrom}: </Text>
                                       {amountDisplay}
                                     </>
                                   );
@@ -245,6 +247,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#ddd'
+  },
+  transactionDate: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
   },
   transactionName: {
     fontWeight: 'bold',

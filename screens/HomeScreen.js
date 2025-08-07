@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ScrollView, View, Text, StyleSheet, Dimensions } from 'react-native';
 import { addMonths, format, startOfDay, endOfDay } from 'date-fns';
 import { RectButton } from 'react-native-gesture-handler';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { supabase } from '../utils/supabase';
+import { Picker } from '@react-native-picker/picker';
 
 function computeMonthlyAccountBalances(transactions, balanceOverrides, accounts) {
   const previousEndingBalances = new Map();
@@ -36,7 +37,17 @@ function computeMonthlyAccountBalances(transactions, balanceOverrides, accounts)
         ? parseFloat(accountOverrides[0].amount)
         : previousEndingBalances.get(account.id) ?? 2000;
 
+      // Apply interest if no override and account has interest_rate
+      let interestApplied = 0;
+      if (accountOverrides.length === 0 && account.interest_rate) {
+        const prevEnd = previousEndingBalances.get(account.id) ?? 2000;
+        const monthlyInterest = (prevEnd * (parseFloat(account.interest_rate) / 12 / 100));
+        starting += monthlyInterest;
+        interestApplied = monthlyInterest;
+      }
+
       let balance = starting;
+      // Add interest to all daily balances at the start of the month
       const dailyBalances = [balance];
 
       monthDays.slice(1).forEach(day => {
@@ -70,6 +81,14 @@ function computeMonthlyAccountBalances(transactions, balanceOverrides, accounts)
         dailyBalances.push(balance);
       });
 
+      // If interest was applied, adjust all dailyBalances by adding interestApplied at the start
+      // (already added to starting, so only need to add to all other dailyBalances as well)
+      if (interestApplied !== 0) {
+        for (let i = 1; i < dailyBalances.length; i++) {
+          dailyBalances[i] += interestApplied;
+        }
+      }
+
       const min = Math.min(...dailyBalances);
       const max = Math.max(...dailyBalances);
       const ending = dailyBalances[dailyBalances.length - 1];
@@ -81,6 +100,7 @@ function computeMonthlyAccountBalances(transactions, balanceOverrides, accounts)
         ending,
         min,
         max,
+        interest: interestApplied,
         dailyBalances,
         monthDays
       };
@@ -94,6 +114,8 @@ export default function HomeScreen() {
   const [transactions, setTransactions] = useState([]);
   const [balanceOverrides, setBalanceOverrides] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [selectedAccountId, setSelectedAccountId] = useState(null);
+
   useEffect(() => {
     const fetchAccounts = async () => {
       const { data, error } = await supabase
@@ -154,13 +176,52 @@ export default function HomeScreen() {
     }));
   };
 
-  const monthlyAccountData = computeMonthlyAccountBalances(transactions, balanceOverrides, accounts);
+  const monthlyAccountData = useMemo(() => {
+    return computeMonthlyAccountBalances(transactions, balanceOverrides, accounts);
+  }, [transactions, balanceOverrides, accounts]);
+  const [filteredMonthlyData, setFilteredMonthlyData] = useState(monthlyAccountData);
+
+  useEffect(() => {
+    if (selectedAccountId === null) {
+      setFilteredMonthlyData(monthlyAccountData);
+    } else {
+      const filtered = monthlyAccountData.map(({ monthLabel, accountsData }) => {
+        
+        const data = {
+          monthLabel,
+          accountsData: []
+        }
+
+        accountsData.forEach(({ account, ...rest }) => {
+          if (Number(account.id) === Number(selectedAccountId)) {
+            data.accountsData.push({ account, ...rest });
+          }
+        });
+
+        return data;
+      });
+      
+      setFilteredMonthlyData(filtered);
+    }
+  }, [selectedAccountId, monthlyAccountData]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Accounts Forecast</Text>
+      <Picker
+        selectedValue={selectedAccountId}
+        onValueChange={(itemValue) => {
+          setSelectedAccountId(itemValue)
+        }}
+        style={{ backgroundColor: '#fff', marginBottom: 12, borderRadius: 4 }}
+      >
+        <Picker.Item label="All Accounts" value={null} />
+        {accounts.map((account) => (
+          <Picker.Item key={account.id} label={account.name} value={account.id} />
+        ))}
+      </Picker>
       <ScrollView>
-        {monthlyAccountData.map(({ monthLabel, accountsData }) => {
+        {filteredMonthlyData.map(({ monthLabel, accountsData }) => {
           const expanded = expandedMonths[monthLabel] || false;
           return (
             <View key={monthLabel} style={{ marginBottom: 12 }}>
@@ -173,65 +234,67 @@ export default function HomeScreen() {
                 />
               </RectButton>
               {expanded &&
-                accountsData.map(({ account, starting, ending, min, max, dailyBalances, monthDays }) => (
-                  <View key={account.id} style={styles.accountCard}>
-                    <Text style={styles.accountName}>{account.name}</Text>
-                    <View style={styles.balanceRow}>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>Start</Text>
-                        <Text style={styles.balanceValue}>${Math.round(starting)}</Text>
+                (accountsData || [])
+                  .map(({ account, starting, ending, min, max, interest, dailyBalances, monthDays }) => (
+                    <View key={account.id} style={styles.accountCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.accountName}>{account.name}</Text>
+                        <Text style={styles.minMax}>
+                          Min: ${Math.round(min)} | Max: ${Math.round(max)}
+                        </Text>
                       </View>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>End</Text>
-                        <Text style={styles.balanceValue}>${Math.round(ending)}</Text>
+                      <View style={styles.balanceRow}>
+                        <View style={styles.balanceColumn}>
+                          <Text style={styles.balanceLabel}>Start</Text>
+                          <Text style={styles.balanceValue}>${Math.round(starting)}</Text>
+                        </View>
+                        <View style={styles.balanceColumn}>
+                          <Text style={styles.balanceLabel}>End</Text>
+                          <Text style={styles.balanceValue}>${Math.round(ending)}</Text>
+                        </View>
+                        <View style={styles.balanceColumn}>
+                          <Text style={styles.balanceLabel}>Interest</Text>
+                          <Text style={styles.balanceValue}>${Math.round(interest)}</Text>
+                        </View>
                       </View>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>Min</Text>
-                        <Text style={styles.balanceValue}>${Math.round(min)}</Text>
-                      </View>
-                      <View style={styles.balanceColumn}>
-                        <Text style={styles.balanceLabel}>Max</Text>
-                        <Text style={styles.balanceValue}>${Math.round(max)}</Text>
+                      <View style={styles.chartContainer}>
+                        <LineChart
+                          data={{
+                            labels: monthDays.map((d, index) => {
+                              const showEvery = Math.ceil(monthDays.length / 10);
+                              return index % showEvery === 0 ? d.slice(-2) : '';
+                            }),
+                            datasets: [{ data: dailyBalances }]
+                          }}
+                          width={Dimensions.get('window').width - 60}
+                          height={160}
+                          chartConfig={{
+                            backgroundColor: '#fff',
+                            backgroundGradientFrom: '#fff',
+                            backgroundGradientTo: '#fff',
+                            decimalPlaces: 0,
+                            color: () => '#007AFF',
+                            labelColor: () => '#999',
+                            formatYLabel: (yValue) => parseInt(yValue).toString(),
+                            propsForDots: { r: '2' },
+                            propsForBackgroundLines: {
+                              stroke: '#eee',
+                              strokeDasharray: '',
+                              strokeWidth: 1
+                            },
+                            propsForVerticalLabels: {
+                              opacity: 1
+                            },
+                            propsForHorizontalLabels: {
+                              opacity: 1
+                            }
+                          }}
+                          bezier
+                          style={{ marginVertical: 8, borderRadius: 8 }}
+                        />
                       </View>
                     </View>
-                    <View style={styles.chartContainer}>
-                      <LineChart
-                        data={{
-                          labels: monthDays.map((d, index) => {
-                            const showEvery = Math.ceil(monthDays.length / 10);
-                            return index % showEvery === 0 ? d.slice(-2) : '';
-                          }),
-                          datasets: [{ data: dailyBalances }]
-                        }}
-                        width={Dimensions.get('window').width - 60}
-                        height={160}
-                        chartConfig={{
-                          backgroundColor: '#fff',
-                          backgroundGradientFrom: '#fff',
-                          backgroundGradientTo: '#fff',
-                          decimalPlaces: 0,
-                          color: () => '#007AFF',
-                          labelColor: () => '#999',
-                          formatYLabel: (yValue) => parseInt(yValue).toString(),
-                          propsForDots: { r: '2' },
-                          propsForBackgroundLines: {
-                            stroke: '#eee',
-                            strokeDasharray: '',
-                            strokeWidth: 1
-                          },
-                          propsForVerticalLabels: {
-                            opacity: 1
-                          },
-                          propsForHorizontalLabels: {
-                            opacity: 1
-                          }
-                        }}
-                        bezier
-                        style={{ marginVertical: 8, borderRadius: 8 }}
-                      />
-                    </View>
-                  </View>
-                ))}
+                  ))}
             </View>
           );
         })}
@@ -251,6 +314,10 @@ const styles = StyleSheet.create({
     borderRadius: 6
   },
   accountName: { fontSize: 16, fontWeight: 'bold' },
+  minMax: {
+    fontSize: 12,
+    color: '#666'
+  },
   // accountType removed
   // accountBalance removed
   buttonContainer: { marginTop: 20 },
