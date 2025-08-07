@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, TextInput, Button, Platform, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../utils/supabase';
-import DatePicker from 'react-native-date-picker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import {screenStyles} from '../styles/screens';
 
 export default function AddTransactionScreen({ navigation }) {
@@ -16,6 +16,7 @@ export default function AddTransactionScreen({ navigation }) {
   const [accountId, setAccountId] = useState('');
   const [transferToAccountId, setTransferToAccountId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -34,6 +35,13 @@ export default function AddTransactionScreen({ navigation }) {
     fetchAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const showDatePicker = () => setDatePickerVisibility(true);
+  const hideDatePicker = () => setDatePickerVisibility(false);
+  const handleConfirm = (selectedDate) => {
+    setDate(selectedDate);
+    hideDatePicker();
+  };
 
   const onSubmit = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -123,25 +131,26 @@ export default function AddTransactionScreen({ navigation }) {
       )}
 
       <Text style={screenStyles.label}>Date</Text>
-      {Platform.select({
-        web: (
-          <input
-            type="date"
-            className="web-date-input"
-            value={date.toISOString().split('T')[0]}
-            onChange={(e) => setDate(new Date(e.target.value))}
-            style={screenStyles.input}
-          />
-        ),
-        default: (
-          <DatePicker
-            date={date}
+      {Platform.OS === 'web' ? (
+        <input
+          type="date"
+          className="web-date-input"
+          value={date.toISOString().split('T')[0]}
+          onChange={(e) => setDate(new Date(e.target.value))}
+          style={screenStyles.input}
+        />
+      ) : (
+        <>
+          <Button title={date.toISOString().split('T')[0]} onPress={showDatePicker} />
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
             mode="date"
-            onDateChange={setDate}
-            androidVariant="nativeAndroid"
+            date={date}
+            onConfirm={handleConfirm}
+            onCancel={hideDatePicker}
           />
-        )
-      })}
+        </>
+      )}
 
       <View style={screenStyles.buttons}>
         <TouchableOpacity onPress={onSubmit} style={screenStyles.primaryButton}>

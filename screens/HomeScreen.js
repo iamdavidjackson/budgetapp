@@ -6,6 +6,90 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { supabase } from '../utils/supabase';
 
+function computeMonthlyAccountBalances(transactions, balanceOverrides, accounts) {
+  const previousEndingBalances = new Map();
+  return Array.from({ length: 12 }, (_, monthOffset) => {
+    const monthDate = addMonths(new Date(), monthOffset);
+    const monthLabel = format(monthDate, 'MMMM yyyy');
+    const monthStart = startOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
+    const monthEnd = endOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
+
+    const overrideDateKey = format(monthStart, 'yyyy-MM-dd');
+    const numDays = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+    const monthDays = Array.from({ length: numDays }, (_, i) =>
+      format(new Date(monthDate.getFullYear(), monthDate.getMonth(), i + 1), 'yyyy-MM-dd')
+    );
+
+    const accountsData = accounts.map((account) => {
+      const filtered = transactions.filter(
+        tx =>
+          (tx.account_id === account.id || tx.secondary_account_id === account.id) &&
+          new Date(tx.date) >= monthStart &&
+          new Date(tx.date) <= monthEnd
+      );
+
+      const accountOverrides = (balanceOverrides || []).filter(
+        o => o.account_id === account.id && o.date === overrideDateKey
+      );
+
+      let starting = accountOverrides.length > 0
+        ? parseFloat(accountOverrides[0].amount)
+        : previousEndingBalances.get(account.id) ?? 2000;
+
+      let balance = starting;
+      const dailyBalances = [balance];
+
+      monthDays.slice(1).forEach(day => {
+        const dailyTxs = filtered.filter(tx => format(new Date(tx.date), 'yyyy-MM-dd') === day);
+        dailyTxs.forEach(tx => {
+          const amount = parseFloat(tx.amount || tx.forecasted_amount || 0);
+          let delta = 0;
+
+          if (tx.type === 'income') {
+            delta = amount;
+          } else if (tx.type === 'expense') {
+            delta = -amount;
+          } else if (tx.type === 'transfer') {
+            if (tx.account_id === account.id) {
+              delta = -amount;
+            } else if (tx.secondary_account_id === account.id) {
+              delta = amount;
+            }
+          }
+
+          balance += delta;
+        });
+
+        const override = (balanceOverrides || []).find(
+          o => o.account_id === account.id && o.date === day
+        );
+        if (override) {
+          balance = parseFloat(override.amount);
+        }
+
+        dailyBalances.push(balance);
+      });
+
+      const min = Math.min(...dailyBalances);
+      const max = Math.max(...dailyBalances);
+      const ending = dailyBalances[dailyBalances.length - 1];
+      previousEndingBalances.set(account.id, ending);
+
+      return {
+        account,
+        starting,
+        ending,
+        min,
+        max,
+        dailyBalances,
+        monthDays
+      };
+    });
+
+    return { monthLabel, accountsData };
+  });
+}
+
 export default function HomeScreen() {
   const [transactions, setTransactions] = useState([]);
   const [balanceOverrides, setBalanceOverrides] = useState([]);
@@ -70,18 +154,14 @@ export default function HomeScreen() {
     }));
   };
 
-  // Track previous ending balances for each account across months
-  const previousEndingBalances = new Map();
+  const monthlyAccountData = computeMonthlyAccountBalances(transactions, balanceOverrides, accounts);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Accounts Forecast</Text>
       <ScrollView>
-        {Array.from({ length: 12 }, (_, monthOffset) => {
-          const monthDate = addMonths(new Date(), monthOffset);
-          const monthLabel = format(monthDate, 'MMMM yyyy');
+        {monthlyAccountData.map(({ monthLabel, accountsData }) => {
           const expanded = expandedMonths[monthLabel] || false;
-
           return (
             <View key={monthLabel} style={{ marginBottom: 12 }}>
               <RectButton onPress={() => toggleExpanded(monthLabel)} style={styles.accordionHeader}>
@@ -93,130 +173,65 @@ export default function HomeScreen() {
                 />
               </RectButton>
               {expanded &&
-                (accounts || []).map((account) => {
-                  const monthStart = startOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
-                  const monthEnd = endOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
-                  const allTx = [...transactions];
-                  const filtered = allTx.filter(
-                    tx =>
-                      (tx.account_id === account.id || tx.secondary_account_id === account.id) &&
-                      new Date(tx.date) >= monthStart &&
-                      new Date(tx.date) <= monthEnd
-                  );
-
-                  const overrideDateKey = format(monthStart, 'yyyy-MM-dd');
-                  const accountOverrides = (balanceOverrides || []).filter(
-                    o => o.account_id === account.id && o.date === overrideDateKey
-                  );
-
-                  const numDays = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-                  const monthDays = Array.from({ length: numDays }, (_, i) =>
-                    format(new Date(monthDate.getFullYear(), monthDate.getMonth(), i + 1), 'yyyy-MM-dd')
-                  );
-
-                  let starting = accountOverrides.length > 0
-                    ? parseFloat(accountOverrides[0].amount)
-                    : previousEndingBalances.get(account.id) ?? 2000;
-
-                  let balance = starting;
-                  const dailyBalances = [balance];
-
-                  monthDays.slice(1).forEach(day => {
-                    const dailyTxs = filtered.filter(tx => format(new Date(tx.date), 'yyyy-MM-dd') === day);
-                    dailyTxs.forEach(tx => {
-                      const amount = parseFloat(tx.amount || tx.forecasted_amount || 0);
-                      let delta = 0;
-
-                      if (tx.type === 'income') {
-                        delta = amount;
-                      } else if (tx.type === 'expense') {
-                        delta = -amount;
-                      } else if (tx.type === 'transfer') {
-                        if (tx.account_id === account.id) {
-                          delta = -amount; // transfer out
-                        } else if (tx.secondary_account_id === account.id) {
-                          delta = amount; // transfer in
-                        }
-                      }
-                      
-                      balance += delta;
-                    });
-
-                    const override = (balanceOverrides || []).find(
-                      o => o.account_id === account.id && o.date === day
-                    );
-                    if (override) {
-                      balance = parseFloat(override.amount);
-                    }
-
-                    dailyBalances.push(balance);
-                  });
-
-                  const min = Math.min(...dailyBalances);
-                  const max = Math.max(...dailyBalances);
-                  const ending = dailyBalances[dailyBalances.length - 1];
-                  previousEndingBalances.set(account.id, ending);
-
-                  return (
-                    <View key={account.id} style={styles.accountCard}>
-                      <Text style={styles.accountName}>{account.name}</Text>
-                      <View style={styles.balanceRow}>
-                        <View style={styles.balanceColumn}>
-                          <Text style={styles.balanceLabel}>Start</Text>
-                          <Text style={styles.balanceValue}>${Math.round(starting)}</Text>
-                        </View>
-                        <View style={styles.balanceColumn}>
-                          <Text style={styles.balanceLabel}>End</Text>
-                          <Text style={styles.balanceValue}>${Math.round(ending)}</Text>
-                        </View>
-                        <View style={styles.balanceColumn}>
-                          <Text style={styles.balanceLabel}>Min</Text>
-                          <Text style={styles.balanceValue}>${Math.round(min)}</Text>
-                        </View>
-                        <View style={styles.balanceColumn}>
-                          <Text style={styles.balanceLabel}>Max</Text>
-                          <Text style={styles.balanceValue}>${Math.round(max)}</Text>
-                        </View>
+                accountsData.map(({ account, starting, ending, min, max, dailyBalances, monthDays }) => (
+                  <View key={account.id} style={styles.accountCard}>
+                    <Text style={styles.accountName}>{account.name}</Text>
+                    <View style={styles.balanceRow}>
+                      <View style={styles.balanceColumn}>
+                        <Text style={styles.balanceLabel}>Start</Text>
+                        <Text style={styles.balanceValue}>${Math.round(starting)}</Text>
                       </View>
-                      <View style={styles.chartContainer}>
-                        <LineChart
-                          data={{
-                            labels: monthDays.map((d, index) => {
-                              const showEvery = Math.ceil(monthDays.length / 10);
-                              return index % showEvery === 0 ? d.slice(-2) : '';
-                            }),
-                            datasets: [{ data: dailyBalances }]
-                          }}
-                          width={Dimensions.get('window').width - 60}
-                          height={160}
-                          chartConfig={{
-                            backgroundColor: '#fff',
-                            backgroundGradientFrom: '#fff',
-                            backgroundGradientTo: '#fff',
-                            decimalPlaces: 0,
-                            color: () => '#007AFF',
-                            labelColor: () => '#999',
-                            formatYLabel: (yValue) => parseInt(yValue).toString(),
-                            propsForDots: { r: '2' },
-                            propsForBackgroundLines: {
-                              stroke: '#eee',
-                              strokeDasharray: '', // solid line
-                              strokeWidth: 1
-                            },
-                            propsForVerticalLabels: {
-                              opacity: 1
-                            },
-                            propsForHorizontalLabels: {
-                              opacity: 1
-                            }
-                          }}
-                          bezier
-                          style={{ marginVertical: 8, borderRadius: 8 }}
-                        />
+                      <View style={styles.balanceColumn}>
+                        <Text style={styles.balanceLabel}>End</Text>
+                        <Text style={styles.balanceValue}>${Math.round(ending)}</Text>
+                      </View>
+                      <View style={styles.balanceColumn}>
+                        <Text style={styles.balanceLabel}>Min</Text>
+                        <Text style={styles.balanceValue}>${Math.round(min)}</Text>
+                      </View>
+                      <View style={styles.balanceColumn}>
+                        <Text style={styles.balanceLabel}>Max</Text>
+                        <Text style={styles.balanceValue}>${Math.round(max)}</Text>
                       </View>
                     </View>
-                  );
-                })}
+                    <View style={styles.chartContainer}>
+                      <LineChart
+                        data={{
+                          labels: monthDays.map((d, index) => {
+                            const showEvery = Math.ceil(monthDays.length / 10);
+                            return index % showEvery === 0 ? d.slice(-2) : '';
+                          }),
+                          datasets: [{ data: dailyBalances }]
+                        }}
+                        width={Dimensions.get('window').width - 60}
+                        height={160}
+                        chartConfig={{
+                          backgroundColor: '#fff',
+                          backgroundGradientFrom: '#fff',
+                          backgroundGradientTo: '#fff',
+                          decimalPlaces: 0,
+                          color: () => '#007AFF',
+                          labelColor: () => '#999',
+                          formatYLabel: (yValue) => parseInt(yValue).toString(),
+                          propsForDots: { r: '2' },
+                          propsForBackgroundLines: {
+                            stroke: '#eee',
+                            strokeDasharray: '',
+                            strokeWidth: 1
+                          },
+                          propsForVerticalLabels: {
+                            opacity: 1
+                          },
+                          propsForHorizontalLabels: {
+                            opacity: 1
+                          }
+                        }}
+                        bezier
+                        style={{ marginVertical: 8, borderRadius: 8 }}
+                      />
+                    </View>
+                  </View>
+                ))}
             </View>
           );
         })}

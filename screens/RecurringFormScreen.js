@@ -3,7 +3,7 @@ import { screenStyles } from '../styles/screens';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, TextInput, ScrollView, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import DatePicker from 'react-native-date-picker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { supabase } from '../utils/supabase';
 
 export default function RecurringFormScreen({ navigation, route }) {
@@ -24,6 +24,24 @@ export default function RecurringFormScreen({ navigation, route }) {
   const [weekendPolicy, setWeekendPolicy] = useState('post_on_date');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(!!recurringId);
+
+  // Date picker modal states and handlers
+  const [isStartDatePickerVisible, setStartDatePickerVisible] = useState(false);
+  const [isEndDatePickerVisible, setEndDatePickerVisible] = useState(false);
+
+  const showStartDatePicker = () => setStartDatePickerVisible(true);
+  const hideStartDatePicker = () => setStartDatePickerVisible(false);
+  const handleConfirmStartDate = (date) => {
+    setStartDate(date);
+    hideStartDatePicker();
+  };
+
+  const showEndDatePicker = () => setEndDatePickerVisible(true);
+  const hideEndDatePicker = () => setEndDatePickerVisible(false);
+  const handleConfirmEndDate = (date) => {
+    setEndDate(date);
+    hideEndDatePicker();
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -318,46 +336,52 @@ export default function RecurringFormScreen({ navigation, route }) {
       </Picker>
 
       <Text style={screenStyles.label}>Start Date</Text>
-      {Platform.select({
-        web: (
-          <input
-            type="date"
-            className="web-date-input"
-            value={startDate.toISOString().split('T')[0]}
-            onChange={(e) => setStartDate(new Date(e.target.value))}
-            style={screenStyles.input}
-          />
-        ),
-        default: (
-          <DatePicker
-            date={startDate}
+      {Platform.OS === 'web' ? (
+        <input
+          type="date"
+          className="web-date-input"
+          value={startDate.toISOString().split('T')[0]}
+          onChange={(e) => setStartDate(new Date(e.target.value))}
+          style={screenStyles.input}
+        />
+      ) : (
+        <>
+          <TouchableOpacity onPress={showStartDatePicker} style={screenStyles.input}>
+            <Text>{startDate.toISOString().split('T')[0]}</Text>
+          </TouchableOpacity>
+          <DateTimePickerModal
+            isVisible={isStartDatePickerVisible}
             mode="date"
-            onDateChange={setStartDate}
-            androidVariant="nativeAndroid"
+            date={startDate}
+            onConfirm={handleConfirmStartDate}
+            onCancel={hideStartDatePicker}
           />
-        )
-      })}
+        </>
+      )}
 
       <Text style={screenStyles.label}>End Date</Text>
-      {Platform.select({
-        web: (
-          <input
-            type="date"
-            className="web-date-input"
-            value={endDate ? endDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => setEndDate(new Date(e.target.value))}
-            style={screenStyles.input}
-          />
-        ),
-        default: (
-          <DatePicker
-            date={endDate || new Date()}
+      {Platform.OS === 'web' ? (
+        <input
+          type="date"
+          className="web-date-input"
+          value={endDate ? endDate.toISOString().split('T')[0] : ''}
+          onChange={(e) => setEndDate(new Date(e.target.value))}
+          style={screenStyles.input}
+        />
+      ) : (
+        <>
+          <TouchableOpacity onPress={showEndDatePicker} style={screenStyles.input}>
+            <Text>{endDate?.toISOString().split('T')[0]}</Text>
+          </TouchableOpacity>
+          <DateTimePickerModal
+            isVisible={isEndDatePickerVisible}
             mode="date"
-            onDateChange={setEndDate}
-            androidVariant="nativeAndroid"
+            date={endDate || new Date()}
+            onConfirm={handleConfirmEndDate}
+            onCancel={hideEndDatePicker}
           />
-        )
-      })}
+        </>
+      )}
 
       <Text style={screenStyles.label}>From Account</Text>
       <Picker selectedValue={accountId} onValueChange={setAccountId} style={screenStyles.picker}>

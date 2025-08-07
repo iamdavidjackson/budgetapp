@@ -123,6 +123,7 @@ export default function ConfirmTransactionFormScreen({ route, navigation }) {
               setDate(selectedDate);
             }}
             onCancel={() => setDatePickerVisible(false)}
+            style={screenStyles.input}
           />
         </>
       )}

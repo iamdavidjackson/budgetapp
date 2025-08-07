@@ -1,11 +1,11 @@
-import { screenStyles } from '../styles/screens';
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Platform, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, Button, Platform, ActivityIndicator, TouchableOpacity } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { format } from 'date-fns';
 
 import { supabase } from '../utils/supabase';
+import { screenStyles } from '../styles/screens';
 
 const BalanceOverrideScreen = () => {
   const route = useRoute();
