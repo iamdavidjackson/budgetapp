@@ -84,7 +84,7 @@ function computeMonthlyAccountBalances(transactions, balanceOverrides, accounts)
       // If interest was applied, adjust all dailyBalances by adding interestApplied at the start
       // (already added to starting, so only need to add to all other dailyBalances as well)
       if (interestApplied !== 0) {
-        for (let i = 1; i < dailyBalances.length; i++) {
+        for (let i = 0; i < dailyBalances.length; i++) {
           dailyBalances[i] += interestApplied;
         }
       }
